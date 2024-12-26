@@ -2,9 +2,10 @@
 
 import { io, Socket } from "Socket.IO-client";
 import { useEffect, useState } from "react";
-import { Box, Button, TextField } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import ChatUI, { ChatMessage } from "@/components/chatui";
 import dayjs from "dayjs";
+import Link from "next/link";
 
 const useSortedMessages = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -38,14 +39,9 @@ const ChatApp = () => {
   }, [dataChannel, addMessage, messages]);
 
   const [socket] = useState<Socket>(io());
+
   useEffect(() => {
-    if (socket.connected) {
-      onConnect();
-    }
-
-    function onConnect() {
-      setIsConnected(true);
-
+    const onConnect = () => {
       socket.on("rtc:offer", async ({ from, payload: offer }) => {
         console.log(`received offer from ${from}: `, offer)
         await rtc.setRemoteDescription(offer);
@@ -61,6 +57,24 @@ const ChatApp = () => {
         console.log(`received candidate from ${from}: `, candidate)
         candidate && await rtc.addIceCandidate(candidate);
       })
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const peerId = urlParams.get("peerId");
+      !!peerId && initiateOffer(peerId)
+      setIsConnected(true);
+    }
+
+    const initiateOffer = async (peerId: string) => {
+      const chatChannel = rtc.createDataChannel("chatChannel")
+      setDataChannel(chatChannel);
+
+      rtc.onicecandidate = event => {
+        event.candidate && socket.emit("rtc:ice", { to: peerId, payload: event.candidate });
+      }
+
+      const offer = await rtc.createOffer();
+      await rtc.setLocalDescription(offer);
+      socket.emit("rtc:offer", { to: peerId, payload: offer });
     }
 
     function onDisconnect() {
@@ -75,7 +89,6 @@ const ChatApp = () => {
     };
   }, [socket]);
 
-  const [targetAddress, setTargetAddress] = useState("");
   const [rtc] = useState(new RTCPeerConnection({
     iceServers: [
       { urls: "stun:stunserver2024.stunprotocol.org:3478" },
@@ -103,25 +116,11 @@ const ChatApp = () => {
     };
   }, [rtc]);
 
-  const onOfferClick = async () => {
-
-    const chatChannel = rtc.createDataChannel("chatChannel")
-    setDataChannel(chatChannel);
-
-    rtc.onicecandidate = event => {
-      event.candidate && socket.emit("rtc:ice", { to: targetAddress, payload: event.candidate });
-    }
-
-    const offer = await rtc.createOffer();
-    await rtc.setLocalDescription(offer);
-    socket.emit("rtc:offer", { to: targetAddress, payload: offer });
-  }
-
   const sendMessage = async (message: string) => {
     const chatMessage = {
+      id: crypto.randomUUID(),
       avatar: "https://avatars.dicebear.com/api/avataaars/1.svg",
       text: message,
-      id: messages.length,
       isUser: true,
       timestamp: dayjs().toISOString()
     }
@@ -129,15 +128,17 @@ const ChatApp = () => {
     dataChannel?.send(JSON.stringify(chatMessage));
   }
 
+  const sessionUrl = `${window.location.origin}/?peerId=${socket?.id}`;
+
   return (
     <main>
       {isConnected && (
-        <Box>
+        <Box p={0} display={"flex"} flexDirection={"column"} height={"100vh"}>
           <Box>
-            <h1>Connected</h1>
-            <div>My address: {socket?.id}</div>
-            <TextField size="small" label="Target" value={targetAddress} onChange={e => setTargetAddress(e.target.value)} />
-            <Button disabled={!targetAddress} onClick={onOfferClick}>Offer</Button>
+            <Typography>Connected</Typography>
+            <Box>
+              My address: <Link target="_blank" style={{color: "auto"}} href={sessionUrl}>{sessionUrl}</Link>
+            </Box>
           </Box>
           <ChatUI messages={messages} sendMessage={sendMessage} />
         </Box>

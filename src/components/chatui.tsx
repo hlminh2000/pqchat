@@ -13,7 +13,7 @@ import { styled } from "@mui/system";
 import { IoSend } from "react-icons/io5";
 
 const ChatContainer = styled(Paper)(({ theme }) => ({
-  height: "80vh",
+  flex: 1,
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
@@ -36,7 +36,7 @@ const MessagesContainer = styled(Box)({
   },
 });
 
-const MessageBubble = styled(Box)(({ isUser }: { isUser : boolean}) => ({
+const MessageBubble = styled(Box)(({ isUser }: { isUser: boolean }) => ({
   display: "flex",
   alignItems: "flex-start",
   marginBottom: "16px",
@@ -63,7 +63,7 @@ const InputContainer = styled(Box)({
 });
 
 export type ChatMessage = {
-  id: number;
+  id: string;
   text: string;
   isUser: boolean;
   timestamp: string;
@@ -102,73 +102,71 @@ const ChatUI = (props: {
   };
 
   return (
-    <Container>
-      <ChatContainer>
-        <MessagesContainer>
-          {messages.map((message) => (
-            <MessageBubble key={message.id} isUser={message.isUser}>
-              <Avatar
-                src={`https://${message.avatar}`}
-                alt={message.isUser ? "User" : "Contact"}
-                sx={{
-                  width: 40,
-                  height: 40,
-                }}
-              />
-              <MessageContent isUser={message.isUser}>
-                <Typography variant="body1" component="div">
-                  {message.text}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{ opacity: 0.7, mt: 0.5, display: "block" }}
-                >
-                  {message.timestamp}
-                </Typography>
-              </MessageContent>
-            </MessageBubble>
-          ))}
-          <div ref={messagesEndRef} />
-        </MessagesContainer>
-        <InputContainer>
-          <Stack direction="row" spacing={2}>
-            <TextField
-              fullWidth
-              multiline
-              maxRows={4}
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type a message..."
-              variant="outlined"
-              size="small"
-              sx={{ 
-                backgroundColor: "#fff",
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: "24px",
-                }
-              }}
-              aria-label="Message input field"
-            />
-            <IconButton
-              onClick={handleSendMessage}
-              color="primary"
-              aria-label="Send message"
+    <ChatContainer>
+      <MessagesContainer>
+        {messages.map((message) => (
+          <MessageBubble key={message.id} isUser={message.isUser}>
+            <Avatar
+              src={`https://${message.avatar}`}
+              alt={message.isUser ? "User" : "Contact"}
               sx={{
-                height: "40px",
-                backgroundColor: "#2196f3",
-                color: "#fff",
-                "&:hover": {
-                  backgroundColor: "#1976d2",
-                },
+                width: 40,
+                height: 40,
               }}
-            >
-              <IoSend />
-            </IconButton>
-          </Stack>
-        </InputContainer>
-      </ChatContainer>
-    </Container>
+            />
+            <MessageContent isUser={message.isUser}>
+              <Typography variant="body1" component="div">
+                {message.text}
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{ opacity: 0.7, mt: 0.5, display: "block" }}
+              >
+                {message.timestamp}
+              </Typography>
+            </MessageContent>
+          </MessageBubble>
+        ))}
+        <div ref={messagesEndRef} />
+      </MessagesContainer>
+      <InputContainer>
+        <Stack direction="row" spacing={2} alignItems={"flex-end"}>
+          <TextField
+            fullWidth
+            multiline
+            maxRows={4}
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Type a message..."
+            variant="outlined"
+            size="small"
+            sx={{
+              backgroundColor: "#fff",
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "24px",
+              }
+            }}
+            aria-label="Message input field"
+          />
+          <IconButton
+            onClick={handleSendMessage}
+            color="primary"
+            aria-label="Send message"
+            sx={{
+              height: "40px",
+              backgroundColor: "#2196f3",
+              color: "#fff",
+              "&:hover": {
+                backgroundColor: "#1976d2",
+              },
+            }}
+          >
+            <IoSend />
+          </IconButton>
+        </Stack>
+      </InputContainer>
+    </ChatContainer>
   );
 };
 
