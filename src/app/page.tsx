@@ -1,11 +1,12 @@
 "use client";
 
 import { io, Socket } from "Socket.IO-client";
-import { useEffect, useState } from "react";
-import { Box, Typography } from "@mui/material";
+import { ReactNode, useEffect, useState } from "react";
+import { Box, Button, Typography } from "@mui/material";
 import ChatUI, { ChatMessage } from "@/components/chatui";
 import dayjs from "dayjs";
 import Link from "next/link";
+import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
 
 const useSortedMessages = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -20,13 +21,20 @@ const useSortedMessages = () => {
 }
 
 const ChatApp = () => {
-  const [isConnected, setIsConnected] = useState(false);
+  const { user } = useAuth0();
+
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+  const [isDataChannelOpen, setIsDataChannelOpen] = useState(false);
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
   const { messages, addMessage } = useSortedMessages();
 
   useEffect(() => {
+    console.log("dataChannel: ", dataChannel)
     if (!dataChannel) return;
+    if(dataChannel.readyState === "open") setIsDataChannelOpen(true);
+
     dataChannel.onclose = event => {
+      setIsDataChannelOpen(false);
       console.log("Channel closed", event);
     }
     dataChannel.onmessage = event => {
@@ -34,12 +42,12 @@ const ChatApp = () => {
       addMessage({ ...chatMessage, isUser: false });
     };
     dataChannel.onopen = () => {
+      setIsDataChannelOpen(true);
       console.log("Now it's open");
     }
-  }, [dataChannel, addMessage, messages]);
+  }, [dataChannel, addMessage, messages, setIsDataChannelOpen]);
 
   const [socket] = useState<Socket>(io());
-
   useEffect(() => {
     const onConnect = () => {
       socket.on("rtc:offer", async ({ from, payload: offer }) => {
@@ -61,12 +69,11 @@ const ChatApp = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const peerId = urlParams.get("peerId");
       !!peerId && initiateOffer(peerId)
-      setIsConnected(true);
+      setIsSocketConnected(true);
     }
 
     const initiateOffer = async (peerId: string) => {
-      const chatChannel = rtc.createDataChannel("chatChannel")
-      setDataChannel(chatChannel);
+      setDataChannel(rtc.createDataChannel("chatChannel"))
 
       rtc.onicecandidate = event => {
         event.candidate && socket.emit("rtc:ice", { to: peerId, payload: event.candidate });
@@ -78,7 +85,7 @@ const ChatApp = () => {
     }
 
     function onDisconnect() {
-      setIsConnected(false);
+      setIsSocketConnected(false);
     }
 
     socket.on("connect", onConnect);
@@ -103,23 +110,22 @@ const ChatApp = () => {
       { urls: "stun:stun4.l.google.com:19302" },
       { urls: "stun:stun4.l.google.com:5349" }
     ],
-    iceCandidatePoolSize: 10
+    iceCandidatePoolSize: 1
   }));
   useEffect(() => {
     rtc.ondatachannel = event => {
-      console.log("ondatachannel: ", event)
-      const chatChannel = event.channel;
-      setDataChannel(chatChannel);
+      console.log("rtc.ondatachannel: ", event)
+      setDataChannel(event.channel);
     }
-    rtc.oniceconnectionstatechange = e => {
-      console.log("rtc.oniceconnectionstatechange:", e)
+    rtc.oniceconnectionstatechange = event => {
+      console.log("rtc.oniceconnectionstatechange:", event)
     };
-  }, [rtc]);
+  }, [rtc, setDataChannel]);
 
   const sendMessage = async (message: string) => {
     const chatMessage = {
       id: crypto.randomUUID(),
-      avatar: "https://avatars.dicebear.com/api/avataaars/1.svg",
+      avatar: user?.picture || "",
       text: message,
       isUser: true,
       timestamp: dayjs().toISOString()
@@ -132,26 +138,66 @@ const ChatApp = () => {
 
   return (
     <main>
-      {isConnected && (
+      {isSocketConnected && (
         <Box p={0} display={"flex"} flexDirection={"column"} height={"100vh"}>
           <Box>
             <Typography>Connected</Typography>
             <Box>
-              My address: <Link target="_blank" style={{color: "auto"}} href={sessionUrl}>{sessionUrl}</Link>
+              My address: <Link target="_blank" style={{ color: "auto" }} href={sessionUrl}>{sessionUrl}</Link>
             </Box>
           </Box>
-          <ChatUI messages={messages} sendMessage={sendMessage} />
+          <ChatUI messages={messages} sendMessage={sendMessage} enabled={isDataChannelOpen} />
         </Box>
       )}
-      {!isConnected && <h1>Connecting...</h1>}
+      {!isSocketConnected && <h1>Connecting...</h1>}
     </main>
   )
 }
 
-export default function Home() {
+const Login = ({ children }: { children : ReactNode}) => {
+  const { loginWithRedirect, logout, user, isLoading } = useAuth0();
+
+  useEffect(() => {
+    if(!isLoading && !user) loginWithRedirect()
+  }, [user, isLoading]);
+  
+  if (isLoading) return <h1>Loading...</h1>
   return (
-    <div>
-      <ChatApp />
-    </div>
+    <Box>
+      <Box>
+        {!isLoading && !!user && <Button onClick={async () => {
+          await logout()
+        }}>Logout</Button>}
+      </Box>
+      {!isLoading && !!user && children}
+    </Box>
+  )
+}
+
+export default function Home() {
+
+  const [win, setWindow] = useState<Window>();
+  useEffect(() => {
+    if (!win) setWindow(window)
+  }, [win]);
+  const peerId = win && new URLSearchParams(win.location.search).get("peerId");
+
+  return (
+    win && <Auth0Provider
+      domain="dev-48o35gs7coyf2b7q.us.auth0.com"
+      clientId="9oVYYrTOPB4nkUcCFv1AkD99UacrXKqH"
+      onRedirectCallback={() => {
+        console.log("onRedirectCallback")
+      }}
+      authorizationParams={{
+        redirect_uri: peerId
+          ? `${win?.location.origin}/?peerId=${peerId}` 
+          : `${win?.location.origin}/`
+      }}
+    >
+      <Login>
+        <ChatApp />
+      </Login>
+    </Auth0Provider>
   );
 }

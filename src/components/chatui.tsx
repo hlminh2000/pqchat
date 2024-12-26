@@ -73,8 +73,9 @@ export type ChatMessage = {
 const ChatUI = (props: {
   messages: ChatMessage[],
   sendMessage: (message: string) => Promise<void>;
+  enabled: boolean;
 }) => {
-  const { messages = [], sendMessage } = props;
+  const { messages = [], sendMessage, enabled } = props;
   // const [messages, setMessages] = useState<Message[]>(dummyMessages);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -107,7 +108,7 @@ const ChatUI = (props: {
         {messages.map((message) => (
           <MessageBubble key={message.id} isUser={message.isUser}>
             <Avatar
-              src={`https://${message.avatar}`}
+              src={message.avatar}
               alt={message.isUser ? "User" : "Contact"}
               sx={{
                 width: 40,
@@ -115,9 +116,11 @@ const ChatUI = (props: {
               }}
             />
             <MessageContent isUser={message.isUser}>
-              <Typography variant="body1" component="div">
-                {message.text}
-              </Typography>
+              <pre>
+                <Typography variant="body1" component="div">
+                  {message.text}
+                </Typography>
+              </pre>
               <Typography
                 variant="caption"
                 sx={{ opacity: 0.7, mt: 0.5, display: "block" }}
@@ -132,6 +135,7 @@ const ChatUI = (props: {
       <InputContainer>
         <Stack direction="row" spacing={2} alignItems={"flex-end"}>
           <TextField
+            disabled={!enabled}
             fullWidth
             multiline
             maxRows={4}
@@ -150,6 +154,7 @@ const ChatUI = (props: {
             aria-label="Message input field"
           />
           <IconButton
+            disabled={!enabled}
             onClick={handleSendMessage}
             color="primary"
             aria-label="Send message"
