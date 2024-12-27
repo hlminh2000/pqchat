@@ -2,11 +2,11 @@
 
 import { io, Socket } from "Socket.IO-client";
 import { ReactNode, useEffect, useState } from "react";
-import { Box, Button, Typography } from "@mui/material";
+import { AppBar, Box, Button, styled, Toolbar } from "@mui/material";
 import ChatUI, { ChatMessage } from "@/components/chatui";
 import dayjs from "dayjs";
-import Link from "next/link";
 import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
+import { InfoButton } from "@/components/InfoButton";
 
 const useSortedMessages = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -20,9 +20,15 @@ const useSortedMessages = () => {
   return { messages, addMessage };
 }
 
-const ChatApp = () => {
-  const { user } = useAuth0();
+const StyledAppBar = styled(AppBar)(({ theme }) => ({
+  backgroundColor: "#ffffff",
+  boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+}));
 
+
+const ChatApp = () => {
+
+  const { logout, user, isLoading: isLoadingUser } = useAuth0();
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [isDataChannelOpen, setIsDataChannelOpen] = useState(false);
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
@@ -31,7 +37,7 @@ const ChatApp = () => {
   useEffect(() => {
     console.log("dataChannel: ", dataChannel)
     if (!dataChannel) return;
-    if(dataChannel.readyState === "open") setIsDataChannelOpen(true);
+    if (dataChannel.readyState === "open") setIsDataChannelOpen(true);
 
     dataChannel.onclose = event => {
       setIsDataChannelOpen(false);
@@ -47,6 +53,8 @@ const ChatApp = () => {
     }
   }, [dataChannel, addMessage, messages, setIsDataChannelOpen]);
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const peerId = urlParams.get("peerId");
   const [socket] = useState<Socket>(io());
   useEffect(() => {
     const onConnect = () => {
@@ -66,8 +74,7 @@ const ChatApp = () => {
         candidate && await rtc.addIceCandidate(candidate);
       })
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const peerId = urlParams.get("peerId");
+      
       !!peerId && initiateOffer(peerId)
       setIsSocketConnected(true);
     }
@@ -140,12 +147,17 @@ const ChatApp = () => {
     <main>
       {isSocketConnected && (
         <Box p={0} display={"flex"} flexDirection={"column"} height={"100vh"}>
-          <Box>
-            <Typography>Connected</Typography>
-            <Box>
-              My address: <Link target="_blank" style={{ color: "auto" }} href={sessionUrl}>{sessionUrl}</Link>
-            </Box>
-          </Box>
+          <StyledAppBar position="sticky">
+            <Toolbar variant="dense">
+              <Box flex={1}>
+                {!peerId && <InfoButton sessionUrl={sessionUrl} />}
+              </Box>
+              <Box flex={1}></Box>
+              {!isLoadingUser && !!user && <Button size="small" onClick={async () => {
+                await logout()
+              }}>Logout</Button>}
+            </Toolbar>
+          </StyledAppBar>
           <ChatUI messages={messages} sendMessage={sendMessage} enabled={isDataChannelOpen} />
         </Box>
       )}
@@ -154,21 +166,16 @@ const ChatApp = () => {
   )
 }
 
-const Login = ({ children }: { children : ReactNode}) => {
+const Login = ({ children }: { children: ReactNode }) => {
   const { loginWithRedirect, logout, user, isLoading } = useAuth0();
 
   useEffect(() => {
-    if(!isLoading && !user) loginWithRedirect()
+    if (!isLoading && !user) loginWithRedirect()
   }, [user, isLoading]);
-  
+
   if (isLoading) return <h1>Loading...</h1>
   return (
     <Box>
-      <Box>
-        {!isLoading && !!user && <Button onClick={async () => {
-          await logout()
-        }}>Logout</Button>}
-      </Box>
       {!isLoading && !!user && children}
     </Box>
   )
@@ -191,7 +198,7 @@ export default function Home() {
       }}
       authorizationParams={{
         redirect_uri: peerId
-          ? `${win?.location.origin}/?peerId=${peerId}` 
+          ? `${win?.location.origin}/?peerId=${peerId}`
           : `${win?.location.origin}/`
       }}
     >
