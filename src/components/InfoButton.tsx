@@ -25,7 +25,7 @@ export const InfoButton = (props: { sessionUrl: string }) => {
         <Box px={1} pb={1}>
           <Typography> <strong>My address:</strong> {props.sessionUrl}</Typography>
           <Box mt={1}>
-            <CopyToClipboard text={props.sessionUrl}>
+            <CopyToClipboard text={props.sessionUrl} onCopy={() => setOpen(false)}>
               <Button variant="outlined" size="small" color="white">Copy</Button>
             </CopyToClipboard>
           </Box>

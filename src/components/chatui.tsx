@@ -11,6 +11,8 @@ import {
 } from "@mui/material";
 import { styled } from "@mui/system";
 import { IoSend } from "react-icons/io5";
+import Markdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 
 const ChatContainer = styled(Paper)(({ theme }) => ({
   flex: 1,
@@ -116,11 +118,32 @@ const ChatUI = (props: {
               }}
             />
             <MessageContent isUser={message.isUser}>
-              <pre>
-                <Typography variant="body1" component="div">
-                  {message.text}
-                </Typography>
-              </pre>
+              <Markdown
+                components={{
+                  code(props) {
+                    const { children, className, node, ...rest } = props
+                    const match = /language-(\w+)/.exec(className || '')
+                    return <SyntaxHighlighter
+                      {...rest}
+                      customStyle={{
+                        background: "rgba(255, 255, 255, 0.9)",
+                        borderRadius: "4px",
+                        padding: '0.6em',
+                      }}
+                      codeTagProps={{
+                        style: {
+                          textShadow: "none"
+                        }
+                      }}
+                      showLineNumbers
+                      PreTag="div"
+                      children={String(children).replace(/\n$/, '')}
+                      language={match?.[1]}
+                    />
+                  }
+                }}
+
+              >{message.text}</Markdown>
               <Typography
                 variant="caption"
                 sx={{ opacity: 0.7, mt: 0.5, display: "block" }}

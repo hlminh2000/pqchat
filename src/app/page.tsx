@@ -8,8 +8,39 @@ import dayjs from "dayjs";
 import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
 import { InfoButton } from "@/components/InfoButton";
 
+const dummyMessages = [
+  {
+    avatar: "",
+    id: crypto.randomUUID(),
+    isUser: true,
+    timestamp: dayjs().toISOString(),
+    text: `
+some code:
+\`\`\`javascript
+console.log("asdf")
+console.log("asdf")
+\`\`\`
+    `
+  },
+  {
+    avatar: "",
+    id: crypto.randomUUID(),
+    isUser: false,
+    timestamp: dayjs().toISOString(),
+    text: `
+some code:
+\`\`\`javascript
+console.log("asdf")
+console.log("asdf")
+\`\`\`
+    `
+  },
+]
+
 const useSortedMessages = () => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    ...dummyMessages
+  ]);
   const addMessage = (message: ChatMessage) => {
     setMessages(prevMessages => {
       const newMessages = [...prevMessages, message];
@@ -107,15 +138,15 @@ const ChatApp = () => {
     iceServers: [
       { urls: "stun:stunserver2024.stunprotocol.org:3478" },
       { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun.l.google.com:5349" },
-      { urls: "stun:stun1.l.google.com:3478" },
-      { urls: "stun:stun1.l.google.com:5349" },
-      { urls: "stun:stun2.l.google.com:19302" },
-      { urls: "stun:stun2.l.google.com:5349" },
-      { urls: "stun:stun3.l.google.com:3478" },
-      { urls: "stun:stun3.l.google.com:5349" },
-      { urls: "stun:stun4.l.google.com:19302" },
-      { urls: "stun:stun4.l.google.com:5349" }
+      // { urls: "stun:stun.l.google.com:5349" },
+      // { urls: "stun:stun1.l.google.com:3478" },
+      // { urls: "stun:stun1.l.google.com:5349" },
+      // { urls: "stun:stun2.l.google.com:19302" },
+      // { urls: "stun:stun2.l.google.com:5349" },
+      // { urls: "stun:stun3.l.google.com:3478" },
+      // { urls: "stun:stun3.l.google.com:5349" },
+      // { urls: "stun:stun4.l.google.com:19302" },
+      // { urls: "stun:stun4.l.google.com:5349" }
     ],
     iceCandidatePoolSize: 1
   }));
