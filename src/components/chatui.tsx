@@ -78,7 +78,7 @@ const ChatUI = (props: {
   enabled: boolean;
 }) => {
   const { messages = [], sendMessage, enabled } = props;
-  // const [messages, setMessages] = useState<Message[]>(dummyMessages);
+  
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 

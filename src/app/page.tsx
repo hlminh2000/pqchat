@@ -39,7 +39,7 @@ console.log("asdf")
 
 const useSortedMessages = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([
-    ...dummyMessages
+    // ...dummyMessages
   ]);
   const addMessage = (message: ChatMessage) => {
     setMessages(prevMessages => {
