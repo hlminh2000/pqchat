@@ -82,7 +82,7 @@ const ChatApp = () => {
       setIsDataChannelOpen(true);
       console.log("Now it's open");
     }
-  }, [dataChannel, addMessage, messages, setIsDataChannelOpen]);
+  }, [dataChannel, addMessage, setIsDataChannelOpen]);
 
   const urlParams = new URLSearchParams(window.location.search);
   const peerId = urlParams.get("peerId");
@@ -168,8 +168,10 @@ const ChatApp = () => {
       isUser: true,
       timestamp: dayjs().toISOString()
     }
-    addMessage(chatMessage);
-    dataChannel?.send(JSON.stringify(chatMessage));
+    if (dataChannel?.readyState === "open") {
+      dataChannel.send(JSON.stringify(chatMessage));
+      addMessage(chatMessage);
+    }
   }
 
   const sessionUrl = `${window.location.origin}/?peerId=${socket?.id}`;
