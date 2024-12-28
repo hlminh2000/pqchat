@@ -3,7 +3,7 @@ import dynamic from 'next/dynamic'
 
 import { io, Socket } from "Socket.IO-client";
 import { ReactNode, useEffect, useMemo, useState } from "react";
-import { AppBar, Box, Button, styled, Toolbar } from "@mui/material";
+import { AppBar, Box, Button, Stack, styled, Toolbar } from "@mui/material";
 import ChatUI, { ChatMessage } from "@/components/chatui";
 import dayjs from "dayjs";
 import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
@@ -11,6 +11,7 @@ import { InfoButton } from "@/components/InfoButton";
 import { AsymetricCryptoUtilsImpl } from "@/utils/AsymetricCryptoUtil";
 import { dummyMessages } from "@/utils/dummy";
 import { EncryptedData, SymmetricCryptoUtils } from "@/utils/SymmetricCryptoUtil";
+import { ToastContainer, toast } from 'react-toastify';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: "#ffffff",
@@ -60,22 +61,22 @@ const ChatApp = () => {
   const keypair = useAsymKeypairs();
   const [peerPk, setPeerPk] = useState<CryptoKey | null>(null);
 
-  const [symKey, setSymKey] = useState<CryptoKey | null>(null)
+  const [sharedSecret, setSymKey] = useState<CryptoKey | null>(null)
 
   type SerializedRtcMessage = { type: "pk", data: JsonWebKey }
-    | { type: "symkey", data: string }  // encrypted cipher
+    | { type: "sharedSecret", data: string }  // encrypted cipher
     | { type: "chat", data: EncryptedData }
   type RtcMessage = { type: "pk", data: JsonWebKey }
-    | { type: "symkey", data: JsonWebKey }
+    | { type: "sharedSecret", data: JsonWebKey }
     | { type: "chat", data: ChatMessage }
   const sendRtcMessage = async (data: RtcMessage) => {
     if (!dataChannel) return
     if (data.type === "pk") {
       dataChannel.send(JSON.stringify(data))
-    } else if (data.type === "chat" && symKey) {
-      const encryptedChatMessage = await symCryptoUtil.encrypt(JSON.stringify(data.data), symKey)
+    } else if (data.type === "chat" && sharedSecret) {
+      const encryptedChatMessage = await symCryptoUtil.encrypt(JSON.stringify(data.data), sharedSecret)
       dataChannel.send(JSON.stringify({ ...data, data: encryptedChatMessage }))
-    } else if (data.type === "symkey" && peerPk) {
+    } else if (data.type === "sharedSecret" && peerPk) {
       const encryptedSymKey = await asymCryptoUtil.encrypt(JSON.stringify(data.data), peerPk)
       dataChannel.send(JSON.stringify({ ...data, data: encryptedSymKey }))
     }
@@ -88,7 +89,7 @@ const ChatApp = () => {
         const symKey = await symCryptoUtil.generateKey()
         setSymKey(symKey.key)
         sendRtcMessage({ 
-          type: "symkey", 
+          type: "sharedSecret", 
           data: symKey.exportedKey
         })
       }
@@ -98,12 +99,11 @@ const ChatApp = () => {
 
   const handleChannelOpen = () => {
     const keys = keypair.keys
-    console.log("Now it's open");
-    console.log("keys: ", keys)
     if (!keys) return
 
     sendRtcMessage({ type: "pk", data: keys.publicKeyJwk })
     setIsDataChannelOpen(true);
+    toast.info("The session has started")
   }
  
   useEffect(() => {
@@ -117,7 +117,7 @@ const ChatApp = () => {
 
     dataChannel.onclose = event => {
       setIsDataChannelOpen(false);
-      console.log("Channel closed", event);
+      toast.info(`${otherUser} has left`)
     }
     dataChannel.onmessage = async event => {
       const rtcMessage: SerializedRtcMessage = JSON.parse(event.data);
@@ -125,10 +125,10 @@ const ChatApp = () => {
       if (rtcMessage.type === "pk") {
         const cryptoKey = await asymCryptoUtil.importRSAKey(rtcMessage.data)
         setPeerPk(cryptoKey)
-      } else if (rtcMessage.type === "chat" && symKey) {
-        const decryptedChatMessage = JSON.parse(await symCryptoUtil.decrypt(rtcMessage.data, symKey)) as ChatMessage
+      } else if (rtcMessage.type === "chat" && sharedSecret) {
+        const decryptedChatMessage = JSON.parse(await symCryptoUtil.decrypt(rtcMessage.data, sharedSecret)) as ChatMessage
         addMessage({ ...decryptedChatMessage, isUser: false });
-      } else if (rtcMessage.type === "symkey" && privateKey) {
+      } else if (rtcMessage.type === "sharedSecret" && privateKey) {
         const decryptedSharedSecret = JSON.parse(await asymCryptoUtil.decrypt(rtcMessage.data, privateKey)) as JsonWebKey
         const symetricKey = await symCryptoUtil.importKey(decryptedSharedSecret)
         setSymKey(symetricKey)
@@ -144,8 +144,8 @@ const ChatApp = () => {
     iceServers: [
       // { urls: "stun:stunserver2024.stunprotocol.org:3478" },
       // { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun.l.google.com:5349" },
-      // { urls: "stun:stun1.l.google.com:3478" },
+      // { urls: "stun:stun.l.google.com:5349" },
+      { urls: "stun:stun1.l.google.com:3478" },
       // { urls: "stun:stun1.l.google.com:5349" },
       // { urls: "stun:stun2.l.google.com:19302" },
       // { urls: "stun:stun2.l.google.com:5349" },
@@ -157,14 +157,34 @@ const ChatApp = () => {
     iceCandidatePoolSize: 1
   }));
 
+  const [otherUser, setOtherUser] = useState<string | null>(null);
   useEffect(() => {
     const onConnect = () => {
-      socket.on("rtc:offer", async ({ from, payload: offer }) => {
-        console.log(`received offer from ${from}: `, offer)
+      socket.on("rtc:offer", async ({ from, payload: { offer, email } }) => {
         await rtc.setRemoteDescription(offer);
-        const answer = await rtc.createAnswer();
-        await rtc.setLocalDescription(answer);
-        socket.emit("rtc:answer", { to: from, payload: answer });
+        toast(
+          ({ closeToast })=> (
+            <Stack>
+              <Box>{email} would like to connect</Box>
+              <Box display={"flex"} justifyContent={"flex-end"}>
+                <Button size='small' variant='outlined' color='success' onClick={async () => {
+                  console.log("offer: ", offer)
+                  const answer = await rtc.createAnswer();
+                  await rtc.setLocalDescription(answer);
+                  socket.emit("rtc:answer", { to: from, payload: answer });
+                  setOtherUser(email)
+                  closeToast();
+                }}>Accept</Button>
+                <Box mr={1}></Box>
+                <Button size='small' variant='outlined' color='error' onClick={async () => {
+                  socket.emit("rtc:deny", { to: from });
+                  closeToast();
+                }}>Deny</Button>
+              </Box>
+            </Stack>
+          ),
+          { autoClose: false, closeButton: () => null }
+        )
       })
       socket.on("rtc:answer", async ({ from, payload: answer }) => {
         console.log(`received answer from ${from}: `, answer)
@@ -173,6 +193,9 @@ const ChatApp = () => {
       socket.on("rtc:ice", async ({ from, payload: candidate }) => {
         console.log(`received candidate from ${from}: `, candidate)
         candidate && await rtc.addIceCandidate(candidate);
+      })
+      socket.on("rtc:deny", async () => {
+        toast.error("Your connection request was denied.")
       })
 
       !!peerId && initiateIceOffer(peerId)
@@ -187,8 +210,8 @@ const ChatApp = () => {
       }
 
       const offer = await rtc.createOffer();
+      socket.emit("rtc:offer", { to: peerId, payload: { offer, email: user?.email } });
       await rtc.setLocalDescription(offer);
-      socket.emit("rtc:offer", { to: peerId, payload: offer });
     }
 
     function onDisconnect() {
@@ -228,10 +251,12 @@ const ChatApp = () => {
 
   const sessionUrl = `${window.location.origin}/?peerId=${socket?.id}`;
 
-  console.log("isDataChannelOpen: ", isDataChannelOpen)
-  console.log("peerPk: ", peerPk)
-  console.log("keypair.keys: ", keypair.keys)
-  console.log("isDataChannelOpen && !!peerPk && !!keypair.keys: ", isDataChannelOpen && !!peerPk && !!keypair.keys)
+  // console.log("====================")
+  // console.log("isDataChannelOpen: ", isDataChannelOpen)
+  // console.log("peerPk: ", peerPk)
+  // console.log("keypair.keys: ", keypair.keys)
+  // console.log("sharedSecret: ", sharedSecret)
+  // console.log("isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret: ", isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret)
   return (
     <main>
       {isSocketConnected && (
@@ -247,7 +272,11 @@ const ChatApp = () => {
               }}>Logout</Button>}
             </Toolbar>
           </StyledAppBar>
-          <ChatUI messages={messages} sendMessage={sendChatMessage} enabled={isDataChannelOpen && !!peerPk && !!keypair.keys} />
+          <ChatUI 
+            messages={messages}
+            sendMessage={sendChatMessage}
+            enabled={isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret} 
+          />
         </Box>
       )}
       {!isSocketConnected && <h1>Connecting...</h1>}
@@ -287,6 +316,7 @@ function Home() {
           : `${window.location.origin}/`
       }}
     >
+      <ToastContainer  />
       <Login>
         <ChatApp />
       </Login>

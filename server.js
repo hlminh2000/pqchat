@@ -33,7 +33,8 @@ app.prepare().then(() => {
       if ([
         "rtc:offer",
         "rtc:answer",
-        "rtc:ice"
+        "rtc:ice",
+        "rtc:deny"
       ].includes(event)) {
         const { to, payload } = data
         sendTo(to, event, { from: socket.id, payload })
