@@ -7,7 +7,6 @@ import {
   Typography,
   Avatar,
   Stack,
-  Container,
 } from "@mui/material";
 import { styled } from "@mui/system";
 import { IoSend } from "react-icons/io5";
@@ -78,7 +77,6 @@ const ChatUI = (props: {
   enabled: boolean;
 }) => {
   const { messages = [], sendMessage, enabled } = props;
-  
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 

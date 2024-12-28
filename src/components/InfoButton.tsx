@@ -2,7 +2,6 @@ import { Box, Button, IconButton, styled, Tooltip, Typography, tooltipClasses, T
 import { useEffect, useState } from "react";
 import { BiInfoCircle } from "react-icons/bi";
 import { CopyToClipboard } from "react-copy-to-clipboard";
-import { IoClose, IoCloseCircle } from "react-icons/io5";
 
 const StyledTooltip = styled(({ className, ...props }: TooltipProps) => (
   <Tooltip {...props} classes={{ popper: className }} />

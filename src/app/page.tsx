@@ -1,41 +1,21 @@
 "use client";
+import dynamic from 'next/dynamic'
 
 import { io, Socket } from "Socket.IO-client";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { AppBar, Box, Button, styled, Toolbar } from "@mui/material";
 import ChatUI, { ChatMessage } from "@/components/chatui";
 import dayjs from "dayjs";
 import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
 import { InfoButton } from "@/components/InfoButton";
+import { AsymetricCryptoUtilsImpl } from "@/utils/AsymetricCryptoUtil";
+import { dummyMessages } from "@/utils/dummy";
+import { EncryptedData, SymmetricCryptoUtils } from "@/utils/SymmetricCryptoUtil";
 
-const dummyMessages = [
-  {
-    avatar: "",
-    id: crypto.randomUUID(),
-    isUser: true,
-    timestamp: dayjs().toISOString(),
-    text: `
-some code:
-\`\`\`javascript
-console.log("asdf")
-console.log("asdf")
-\`\`\`
-    `
-  },
-  {
-    avatar: "",
-    id: crypto.randomUUID(),
-    isUser: false,
-    timestamp: dayjs().toISOString(),
-    text: `
-some code:
-\`\`\`javascript
-console.log("asdf")
-console.log("asdf")
-\`\`\`
-    `
-  },
-]
+const StyledAppBar = styled(AppBar)(({ theme }) => ({
+  backgroundColor: "#ffffff",
+  boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+}));
 
 const useSortedMessages = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -51,13 +31,24 @@ const useSortedMessages = () => {
   return { messages, addMessage };
 }
 
-const StyledAppBar = styled(AppBar)(({ theme }) => ({
-  backgroundColor: "#ffffff",
-  boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-}));
+const asymCryptoUtil = new AsymetricCryptoUtilsImpl();
+const useAsymKeypairs = () => {
+  const [keys, setKeys] = useState<Awaited<ReturnType<typeof asymCryptoUtil.generateRSAKeyPair>> | null>(null)
+  const regenerate = async () => {
+    setKeys(await asymCryptoUtil.generateRSAKeyPair())
+  }
+  useEffect(() => {
+    regenerate()
+  }, [])
+  return { keys, regenerate }
+}
 
+const symCryptoUtil = new SymmetricCryptoUtils();
 
 const ChatApp = () => {
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const peerId = urlParams.get("peerId");
 
   const { logout, user, isLoading: isLoadingUser } = useAuth0();
   const [isSocketConnected, setIsSocketConnected] = useState(false);
@@ -65,28 +56,106 @@ const ChatApp = () => {
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
   const { messages, addMessage } = useSortedMessages();
 
+  const keypair = useAsymKeypairs();
+  const [peerPk, setPeerPk] = useState<CryptoKey | null>(null);
+
+  const [symKey, setSymKey] = useState<CryptoKey | null>(null)
+
+  type SerializedRtcMessage = { type: "pk", data: JsonWebKey }
+    | { type: "symkey", data: string }  // encrypted cipher
+    | { type: "chat", data: EncryptedData }
+  type RtcMessage = { type: "pk", data: JsonWebKey }
+    | { type: "symkey", data: JsonWebKey }
+    | { type: "chat", data: ChatMessage }
+  const sendRtcMessage = async (data: RtcMessage) => {
+    if (!dataChannel) return
+    if (data.type === "pk") {
+      dataChannel.send(JSON.stringify(data))
+    } else if (data.type === "chat" && symKey) {
+      const encryptedChatMessage = await symCryptoUtil.encrypt(JSON.stringify(data.data), symKey)
+      dataChannel.send(JSON.stringify({ ...data, data: encryptedChatMessage }))
+    } else if (data.type === "symkey" && peerPk) {
+      const encryptedSymKey = await asymCryptoUtil.encrypt(JSON.stringify(data.data), peerPk)
+      dataChannel.send(JSON.stringify({ ...data, data: encryptedSymKey }))
+    }
+  }
+
+  /** When the peerkPk is available, optionally generate and send shared secret **/
   useEffect(() => {
-    console.log("dataChannel: ", dataChannel)
+    (async () => {
+      if (!peerId && !!peerPk){  // Elect the host to establish shared symetric key
+        const symKey = await symCryptoUtil.generateKey()
+        setSymKey(symKey.key)
+        sendRtcMessage({ 
+          type: "symkey", 
+          data: symKey.exportedKey
+        })
+      }
+    })()
+  }, [peerPk])
+  /********************************************************************************/
+
+  const handleChannelOpen = () => {
+    const keys = keypair.keys
+    console.log("Now it's open");
+    console.log("keys: ", keys)
+    if (!keys) return
+
+    sendRtcMessage({ type: "pk", data: keys.publicKeyJwk })
+    setIsDataChannelOpen(true);
+  }
+ 
+  useEffect(() => {
+    if (dataChannel?.readyState === "open") {
+      handleChannelOpen()
+    }
+  }, [dataChannel])
+
+  useEffect(() => {
     if (!dataChannel) return;
-    if (dataChannel.readyState === "open") setIsDataChannelOpen(true);
 
     dataChannel.onclose = event => {
       setIsDataChannelOpen(false);
       console.log("Channel closed", event);
     }
-    dataChannel.onmessage = event => {
-      const chatMessage: ChatMessage = JSON.parse(event.data);
-      addMessage({ ...chatMessage, isUser: false });
+    dataChannel.onmessage = async event => {
+      const rtcMessage: SerializedRtcMessage = JSON.parse(event.data);
+      const privateKey = keypair.keys?.privateKey
+      if (rtcMessage.type === "pk") {
+        const cryptoKey = await asymCryptoUtil.importRSAKey(rtcMessage.data)
+        setPeerPk(cryptoKey)
+      } else if (rtcMessage.type === "chat" && symKey) {
+        const decryptedChatMessage = JSON.parse(await symCryptoUtil.decrypt(rtcMessage.data, symKey)) as ChatMessage
+        addMessage({ ...decryptedChatMessage, isUser: false });
+      } else if (rtcMessage.type === "symkey" && privateKey) {
+        const decryptedSharedSecret = JSON.parse(await asymCryptoUtil.decrypt(rtcMessage.data, privateKey)) as JsonWebKey
+        const symetricKey = await symCryptoUtil.importKey(decryptedSharedSecret)
+        setSymKey(symetricKey)
+      }
     };
     dataChannel.onopen = () => {
-      setIsDataChannelOpen(true);
-      console.log("Now it's open");
+      handleChannelOpen()
     }
-  }, [dataChannel, addMessage, setIsDataChannelOpen]);
+  }, [dataChannel, addMessage, setPeerPk, setSymKey, setIsDataChannelOpen, handleChannelOpen]);
 
-  const urlParams = new URLSearchParams(window.location.search);
-  const peerId = urlParams.get("peerId");
   const [socket] = useState<Socket>(io());
+  const [rtc] = useState(new RTCPeerConnection({
+    iceServers: [
+      // { urls: "stun:stunserver2024.stunprotocol.org:3478" },
+      // { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun.l.google.com:5349" },
+      // { urls: "stun:stun1.l.google.com:3478" },
+      // { urls: "stun:stun1.l.google.com:5349" },
+      // { urls: "stun:stun2.l.google.com:19302" },
+      // { urls: "stun:stun2.l.google.com:5349" },
+      // { urls: "stun:stun3.l.google.com:3478" },
+      // { urls: "stun:stun3.l.google.com:5349" },
+      // { urls: "stun:stun4.l.google.com:19302" },
+      // { urls: "stun:stun4.l.google.com:5349" }
+    ],
+    iceCandidatePoolSize: 1
+  }));
+
   useEffect(() => {
     const onConnect = () => {
       socket.on("rtc:offer", async ({ from, payload: offer }) => {
@@ -105,7 +174,6 @@ const ChatApp = () => {
         candidate && await rtc.addIceCandidate(candidate);
       })
 
-      
       !!peerId && initiateOffer(peerId)
       setIsSocketConnected(true);
     }
@@ -132,35 +200,18 @@ const ChatApp = () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
     };
-  }, [socket]);
-
-  const [rtc] = useState(new RTCPeerConnection({
-    iceServers: [
-      { urls: "stun:stunserver2024.stunprotocol.org:3478" },
-      { urls: "stun:stun.l.google.com:19302" },
-      // { urls: "stun:stun.l.google.com:5349" },
-      // { urls: "stun:stun1.l.google.com:3478" },
-      // { urls: "stun:stun1.l.google.com:5349" },
-      // { urls: "stun:stun2.l.google.com:19302" },
-      // { urls: "stun:stun2.l.google.com:5349" },
-      // { urls: "stun:stun3.l.google.com:3478" },
-      // { urls: "stun:stun3.l.google.com:5349" },
-      // { urls: "stun:stun4.l.google.com:19302" },
-      // { urls: "stun:stun4.l.google.com:5349" }
-    ],
-    iceCandidatePoolSize: 1
-  }));
+  }, [socket, rtc]);
   useEffect(() => {
     rtc.ondatachannel = event => {
       console.log("rtc.ondatachannel: ", event)
-      setDataChannel(event.channel);
+      setDataChannel(event.channel)
     }
     rtc.oniceconnectionstatechange = event => {
       console.log("rtc.oniceconnectionstatechange:", event)
     };
   }, [rtc, setDataChannel]);
 
-  const sendMessage = async (message: string) => {
+  const sendChatMessage = async (message: string) => {
     const chatMessage = {
       id: crypto.randomUUID(),
       avatar: user?.picture || "",
@@ -169,13 +220,17 @@ const ChatApp = () => {
       timestamp: dayjs().toISOString()
     }
     if (dataChannel?.readyState === "open") {
-      dataChannel.send(JSON.stringify(chatMessage));
+      sendRtcMessage({ type: "chat", data: chatMessage })
       addMessage(chatMessage);
     }
   }
 
   const sessionUrl = `${window.location.origin}/?peerId=${socket?.id}`;
 
+  console.log("isDataChannelOpen: ", isDataChannelOpen)
+  console.log("peerPk: ", peerPk)
+  console.log("keypair.keys: ", keypair.keys)
+  console.log("isDataChannelOpen && !!peerPk && !!keypair.keys: ", isDataChannelOpen && !!peerPk && !!keypair.keys)
   return (
     <main>
       {isSocketConnected && (
@@ -191,7 +246,7 @@ const ChatApp = () => {
               }}>Logout</Button>}
             </Toolbar>
           </StyledAppBar>
-          <ChatUI messages={messages} sendMessage={sendMessage} enabled={isDataChannelOpen} />
+          <ChatUI messages={messages} sendMessage={sendChatMessage} enabled={isDataChannelOpen && !!peerPk && !!keypair.keys} />
         </Box>
       )}
       {!isSocketConnected && <h1>Connecting...</h1>}
@@ -200,7 +255,7 @@ const ChatApp = () => {
 }
 
 const Login = ({ children }: { children: ReactNode }) => {
-  const { loginWithRedirect, logout, user, isLoading } = useAuth0();
+  const { loginWithRedirect, user, isLoading } = useAuth0();
 
   useEffect(() => {
     if (!isLoading && !user) loginWithRedirect()
@@ -214,16 +269,12 @@ const Login = ({ children }: { children: ReactNode }) => {
   )
 }
 
-export default function Home() {
+function Home() {
 
-  const [win, setWindow] = useState<Window>();
-  useEffect(() => {
-    if (!win) setWindow(window)
-  }, [win]);
-  const peerId = win && new URLSearchParams(win.location.search).get("peerId");
+  const peerId = new URLSearchParams(window.location.search).get("peerId");
 
   return (
-    win && <Auth0Provider
+    <Auth0Provider
       domain="dev-48o35gs7coyf2b7q.us.auth0.com"
       clientId="9oVYYrTOPB4nkUcCFv1AkD99UacrXKqH"
       onRedirectCallback={() => {
@@ -231,8 +282,8 @@ export default function Home() {
       }}
       authorizationParams={{
         redirect_uri: peerId
-          ? `${win?.location.origin}/?peerId=${peerId}`
-          : `${win?.location.origin}/`
+          ? `${window.location.origin}/?peerId=${peerId}`
+          : `${window.location.origin}/`
       }}
     >
       <Login>
@@ -241,3 +292,5 @@ export default function Home() {
     </Auth0Provider>
   );
 }
+
+export default dynamic(() => Promise.resolve(Home), {ssr: false})
