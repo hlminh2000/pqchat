@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, KeyboardEventHandler } from "react";
 import {
   Box,
   TextField,
@@ -100,7 +100,7 @@ const ChatUI = (props: {
     }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress: KeyboardEventHandler<HTMLDivElement> = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -167,7 +167,7 @@ const ChatUI = (props: {
             maxRows={4}
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             placeholder="Type a message..."
             variant="outlined"
             size="small"
