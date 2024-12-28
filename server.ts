@@ -1,6 +1,6 @@
 import { createServer } from "http";
 import next from "next";
-import { Server } from "Socket.IO";
+import { Server, Socket } from "Socket.IO";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
@@ -13,9 +13,9 @@ app.prepare().then(() => {
 
   const io = new Server(httpServer);
 
-  const clients = {}
+  const clients: { [k: string]: { socket: Socket } } = {}
 
-  const sendTo = (clientId, event, data) => {
+  const sendTo = (clientId: string, event: string, data: any) => {
     const client = clients[clientId]
     if (!client) {
       return

@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "nodemon server.js",
+    "dev": "nodemon server.ts",
     "build": "next build",
-    "start": "NODE_ENV=production node server.js",
+    "start": "NODE_ENV=production node server.ts",
     "lint": "next lint"
   },
   "dependencies": {
@@ -25,9 +25,9 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1"
   },
-  "type": "module",
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/next": "^8.0.7",
+    "@types/node": "^20.17.10",
     "@types/react": "^19",
     "@types/react-copy-to-clipboard": "^5.0.7",
     "@types/react-dom": "^19",
