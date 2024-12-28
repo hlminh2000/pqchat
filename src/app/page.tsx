@@ -22,6 +22,7 @@ const useSortedMessages = () => {
     // ...dummyMessages
   ]);
   const addMessage = (message: ChatMessage) => {
+    // heuristically, just sort the last 10 mesasges, previous ones are assumed sorted
     setMessages(prevMessages => {
       const newMessages = [...prevMessages, message];
       const lastTenMessages = newMessages.slice(-10).sort((a, b) => dayjs(a.timestamp).diff(dayjs(b.timestamp)));
@@ -32,6 +33,8 @@ const useSortedMessages = () => {
 }
 
 const asymCryptoUtil = new AsymetricCryptoUtilsImpl();
+const symCryptoUtil = new SymmetricCryptoUtils();
+
 const useAsymKeypairs = () => {
   const [keys, setKeys] = useState<Awaited<ReturnType<typeof asymCryptoUtil.generateRSAKeyPair>> | null>(null)
   const regenerate = async () => {
@@ -42,8 +45,6 @@ const useAsymKeypairs = () => {
   }, [])
   return { keys, regenerate }
 }
-
-const symCryptoUtil = new SymmetricCryptoUtils();
 
 const ChatApp = () => {
 
@@ -174,11 +175,11 @@ const ChatApp = () => {
         candidate && await rtc.addIceCandidate(candidate);
       })
 
-      !!peerId && initiateOffer(peerId)
+      !!peerId && initiateIceOffer(peerId)
       setIsSocketConnected(true);
     }
 
-    const initiateOffer = async (peerId: string) => {
+    const initiateIceOffer = async (peerId: string) => {
       setDataChannel(rtc.createDataChannel("chatChannel"))
 
       rtc.onicecandidate = event => {
