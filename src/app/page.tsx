@@ -120,6 +120,7 @@ const ChatApp = () => {
       toast.info(`${otherUser} has left`)
     }
     dataChannel.onmessage = async event => {
+      console.log("rtc message: ", event.data)
       const rtcMessage: SerializedRtcMessage = JSON.parse(event.data);
       const privateKey = keypair.keys?.privateKey
       if (rtcMessage.type === "pk") {

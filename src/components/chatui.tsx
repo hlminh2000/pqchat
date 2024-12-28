@@ -37,14 +37,19 @@ const MessagesContainer = styled(Box)({
   },
 });
 
-const MessageBubble = styled(Box)(({ isUser }: { isUser: boolean }) => ({
+type MessageBubbleStyleProp = { isUser: boolean }
+const MessageBubble = styled
+(({ isUser, ...rest }: MessageBubbleStyleProp) => <Box {...rest} />) // avoids passing `isUser` to the DOM
+(({ isUser }: MessageBubbleStyleProp) => ({
   display: "flex",
   alignItems: "flex-start",
   marginBottom: "16px",
   flexDirection: isUser ? "row-reverse" : "row",
 }));
 
-const MessageContent = styled(Paper)(({ isUser }: { isUser: boolean }) => ({
+const MessageContent = styled
+(({ isUser, ...rest }: MessageBubbleStyleProp) => <Paper {...rest} />) // avoids passing `isUser` to the DOM
+(({ isUser }: MessageBubbleStyleProp) => ({
   padding: "12px 16px",
   borderRadius: "16px",
   maxWidth: "70%",
