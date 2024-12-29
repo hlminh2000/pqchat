@@ -29,7 +29,7 @@ export const InfoButton = (props: { sessionUrl: string }) => {
     <StyledTooltip open={open} arrow title={
       <Box>
         <Box px={1} pb={1} pt={1}>
-          <Typography> <strong>Chat link:</strong> {props.sessionUrl}</Typography>
+          <Typography> <strong>Ephemeral chat link:</strong> {props.sessionUrl}</Typography>
           <Box mt={1}>
             <CopyToClipboard text={props.sessionUrl} onCopy={() => setOpen(false)}>
               <Button 
