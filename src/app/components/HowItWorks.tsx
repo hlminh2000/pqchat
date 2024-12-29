@@ -7,6 +7,7 @@ import TimelineSeparator from '@mui/lab/TimelineSeparator'
 import TimelineConnector from '@mui/lab/TimelineConnector'
 import TimelineContent from '@mui/lab/TimelineContent'
 import TimelineDot from '@mui/lab/TimelineDot'
+import { useTheme } from '@mui/material'
 
 const steps = [
   {
@@ -15,7 +16,7 @@ const steps = [
   },
   {
     title: "Establish P2P Connection",
-    description: "A secure peer-to-peer connection is established between participants."
+    description: "A secure peer-to-peer connection is established between participants, no intermediary server."
   },
   {
     title: "Chat Securely",
@@ -23,11 +24,12 @@ const steps = [
   },
   {
     title: "Messages Disappear",
-    description: "Once read, messages vanish, leaving no trace on devices or servers."
+    description: "Once the window is closed, messages are gone, leaving no trace on devices or servers."
   }
 ]
 
 export default function HowItWorks() {
+  const theme = useTheme()
   return (
     <Box id="how-it-works" sx={{ py: 8, bgcolor: 'grey.50' }}>
       <Container maxWidth="md">
@@ -38,7 +40,18 @@ export default function HowItWorks() {
           {steps.map((step, index) => (
             <TimelineItem key={index}>
               <TimelineSeparator>
-                <TimelineDot color="primary" />
+                {/* <TimelineDot color="primary" /> */}
+                <div style={{
+                  borderRadius: 100,
+                  border: `solid 2px ${theme.palette.primary.main}`,
+                  width: 30,
+                  height: 30,
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center"
+                }}>
+                  <Typography color='primary'>{index + 1}</Typography>
+                </div>
                 {index < steps.length - 1 && <TimelineConnector />}
               </TimelineSeparator>
               <TimelineContent>
