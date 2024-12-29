@@ -136,7 +136,7 @@ const ChatApp = () => {
   const [rtc] = useState(new RTCPeerConnection({
     iceServers: [
       { urls: "stun:stunserver2024.stunprotocol.org:3478" },
-      // { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun.l.google.com:19302" },
       // { urls: "stun:stun.l.google.com:5349" },
       // { urls: "stun:stun1.l.google.com:3478" },
       // { urls: "stun:stun1.l.google.com:5349" },
