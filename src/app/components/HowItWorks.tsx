@@ -12,11 +12,11 @@ import { useTheme } from '@mui/material'
 const steps = [
   {
     title: "Create or Join a Chat",
-    description: "Generate a unique link or enter one to join someone else."
+    description: "Generate a unique link to share, or enter one to join someone else."
   },
   {
     title: "Establish P2P Connection",
-    description: "A secure peer-to-peer connection is established between participants, no intermediary server."
+    description: "A secure peer-to-peer connection is established between two participants, no intermediary server."
   },
   {
     title: "Chat Securely",
