@@ -36,17 +36,6 @@ const useSortedMessages = () => {
 const asymCryptoUtil = new AsymetricCryptoUtilsImpl();
 const symCryptoUtil = new SymmetricCryptoUtils();
 
-const useAsymKeypairs = () => {
-  const [keys, setKeys] = useState<Awaited<ReturnType<typeof asymCryptoUtil.generateRSAKeyPair>> | null>(null)
-  const regenerate = async () => {
-    setKeys(await asymCryptoUtil.generateRSAKeyPair())
-  }
-  useEffect(() => {
-    regenerate()
-  }, [])
-  return { keys, regenerate }
-}
-
 const ChatApp = () => {
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -59,10 +48,10 @@ const ChatApp = () => {
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
   const { messages, addMessage } = useSortedMessages();
 
-  const keypair = useAsymKeypairs();
   const [peerPk, setPeerPk] = useState<CryptoKey | null>(null);
-
   const [sharedSecret, setSharedSecret] = useState<CryptoKey | null>(null)
+  const [asymKeyPair, setAsymKeyPair] = useState<Awaited<ReturnType<typeof asymCryptoUtil.generateRSAKeyPair>> | null>(null)
+
 
   type SerializedRtcMessage = { type: "pk", data: JsonWebKey }
     | { type: "sharedSecret", data: string }  // encrypted cipher
@@ -98,12 +87,12 @@ const ChatApp = () => {
   }, [peerPk, dataChannel])
   /********************************************************************************/
 
-  const handleChannelOpen = () => {
+  const handleChannelOpen = async () => {
     console.log("channel open!")
-    const keys = keypair.keys
-    if (!keys) return
 
-    sendRtcMessage({ type: "pk", data: keys.publicKeyJwk })
+    const keyPair = await asymCryptoUtil.generateRSAKeyPair()
+    setAsymKeyPair(keyPair)
+    await sendRtcMessage({ type: "pk", data: keyPair.publicKeyJwk })
     setIsDataChannelOpen(true);
     toast.info("The session has started")
   }
@@ -124,7 +113,7 @@ const ChatApp = () => {
     dataChannel.onmessage = async event => {
       console.log("rtc message: ", event.data)
       const rtcMessage: SerializedRtcMessage = JSON.parse(event.data);
-      const privateKey = keypair.keys?.privateKey
+      const privateKey = asymKeyPair?.privateKey
       if (rtcMessage.type === "pk") {
         const cryptoKey = await asymCryptoUtil.importRSAKey(rtcMessage.data)
         setPeerPk(cryptoKey)
@@ -303,11 +292,11 @@ const ChatApp = () => {
   console.log("====================")
   console.log("isDataChannelOpen: ", isDataChannelOpen)
   console.log("peerPk: ", peerPk)
-  console.log("keypair.keys: ", keypair.keys)
+  console.log("asymKeyPair: ", asymKeyPair)
   console.log("sharedSecret: ", sharedSecret)
-  console.log("isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret: ", isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret)
+  console.log("isDataChannelOpen && !!peerPk && !!asymKeyPair && !!sharedSecret: ", isDataChannelOpen && !!peerPk && !!asymKeyPair && !!sharedSecret)
   console.log("====================")
-  const isChatReady = isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret
+  const isChatReady = isDataChannelOpen && !!peerPk && !!asymKeyPair && !!sharedSecret
   return (
     <main>
       <Box p={0} display={"flex"} flexDirection={"column"} height={"100vh"}>
