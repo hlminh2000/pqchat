@@ -307,6 +307,7 @@ const ChatApp = () => {
   console.log("sharedSecret: ", sharedSecret)
   console.log("isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret: ", isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret)
   console.log("====================")
+  const isChatReady = isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret
   return (
     <main>
       <Box p={0} display={"flex"} flexDirection={"column"} height={"100vh"}>
@@ -326,10 +327,11 @@ const ChatApp = () => {
         <ChatUI
           messages={messages}
           sendMessage={sendChatMessage}
-          enabled={isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret}
+          enabled={isChatReady}
         />
       </Box>
       <LoadingOverlay open={!isSocketConnected} message={"Connecting"} />
+      <LoadingOverlay open={isSocketConnected && !isChatReady && !!peerId} message={"Waiting for host to accept your request"} />
     </main>
   )
 }
