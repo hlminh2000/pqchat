@@ -4,7 +4,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { AppBar, Box, Button, Stack, styled, Toolbar } from "@mui/material";
 import ChatUI, { ChatMessage } from "@/components/chatui";
 import dayjs from "dayjs";
-import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
+import { Auth0Provider, IdToken, useAuth0 } from '@auth0/auth0-react';
 import { InfoButton } from "@/components/InfoButton";
 import { AsymetricCryptoUtilsImpl } from "@/utils/AsymetricCryptoUtil";
 import { EncryptedData, SymmetricCryptoUtils } from "@/utils/SymmetricCryptoUtil";
@@ -119,7 +119,7 @@ const ChatApp = () => {
 
     dataChannel.onclose = event => {
       setIsDataChannelOpen(false);
-      toast.info(`${otherUser} has left`)
+      toast.info(`${otherUser?.email || otherUser?.nickname} has left`)
     }
     dataChannel.onmessage = async event => {
       console.log("rtc message: ", event.data)
@@ -160,7 +160,7 @@ const ChatApp = () => {
     iceCandidatePoolSize: 1
   }));
 
-  const [otherUser, setOtherUser] = useState<string | null>(null);
+  const [otherUser, setOtherUser] = useState<IdToken | null>(null);
   useEffect(() => {
     const ablyClient = new Ably.Realtime({ authUrl: '/api/ably' })
     const signalingChannel = ablyClient.channels.get(`signaling:${selfId}`);
@@ -196,8 +196,15 @@ const ChatApp = () => {
         case "rtc:offer":
 
           const { offer, idToken } = payload;
-          const { valid, payload: { nickname, email } } = await verifyIdToken(idToken.__raw)
+          const { valid, payload: userData } = await verifyIdToken(idToken.__raw)
+          const issuedAt = dayjs(userData.iat*1000)
+          if (issuedAt.isBefore(dayjs().subtract(1, "hour"))) {
+            console.log("identity too old")
+            return
+          }
           if (!valid) return
+
+          const { nickname, email } = userData
 
           toast(
             ({ closeToast }) => (
@@ -210,7 +217,7 @@ const ChatApp = () => {
                     const answer = await rtc.createAnswer();
                     await rtc.setLocalDescription(answer);
                     targetAblyChannel.publish("rtc:answer", { from, payload: answer })
-                    setOtherUser(email || nickname || "")
+                    setOtherUser(userData)
                     closeToast();
                   }}>Accept</Button>
                   <Box mr={1}></Box>
