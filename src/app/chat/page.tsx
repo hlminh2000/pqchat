@@ -183,8 +183,7 @@ const ChatApp = () => {
       }
 
       switch (name as "rtc:offer" | "rtc:answer" | "rtc:ice" | "rtc:deny") {
-        case "rtc:offer":
-
+        case "rtc:offer": {
           const { offer, idToken } = payload;
           const { valid, payload: userData } = await verifyIdToken(idToken.__raw)
           const issuedAt = dayjs((userData?.iat || 0) * 1000)
@@ -205,8 +204,9 @@ const ChatApp = () => {
                     pendingOffers[from].offer = offer
                     await attemptCompleteConnection(from);
                     const answer = await rtc.createAnswer();
+                    const idtoken = await getIdTokenClaims();
                     await rtc.setLocalDescription(answer);
-                    targetAblyChannel.publish("rtc:answer", { from, payload: answer })
+                    targetAblyChannel.publish("rtc:answer", { from, payload: answer, idtoken })
                     setOtherUser(userData)
                     closeToast();
                   }}>Accept</Button>
@@ -221,10 +221,14 @@ const ChatApp = () => {
             { autoClose: false, closeButton: () => null }
           )
           break;
-
+        }
         case "rtc:answer":
           console.log(`received answer from ${from}: `, payload)
-          await rtc.setRemoteDescription(payload);
+          const { answer, idToken } = payload;
+          const { valid, payload: userData } = await verifyIdToken(idToken.__raw)
+          if(!valid) return
+          setOtherUser(userData)
+          await rtc.setRemoteDescription(answer);
           break;
 
         case "rtc:ice":
