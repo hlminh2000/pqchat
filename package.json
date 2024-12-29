@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "nodemon server.ts",
+    "dev": "next dev",
     "build": "next build",
-    "start": "NODE_ENV=production ts-node server.ts",
+    "start": "NODE_ENV=production next start",
     "lint": "next lint"
   },
   "dependencies": {
@@ -14,10 +14,12 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/material": "^6.3.0",
+    "ably": "^2.6.0",
     "dayjs": "^1.11.13",
     "idtoken-verifier": "^2.2.4",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
+    "mqtt": "^5.10.3",
     "next": "15.1.2",
     "react": "^19.0.0",
     "react-copy-to-clipboard": "^5.1.0",
@@ -27,7 +29,8 @@
     "react-syntax-highlighter": "^15.6.1",
     "react-toastify": "^11.0.2",
     "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1"
+    "socket.io-client": "^4.8.1",
+    "uuid": "^11.0.3"
   },
   "devDependencies": {
     "@types/next": "^8.0.7",

@@ -1,22 +1,16 @@
 "use client";
 import dynamic from 'next/dynamic'
-
-import { io, Socket } from "Socket.IO-client";
-import { ReactNode, use, useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { AppBar, Box, Button, Stack, styled, Toolbar } from "@mui/material";
 import ChatUI, { ChatMessage } from "@/components/chatui";
 import dayjs from "dayjs";
-
-import { Auth0Provider, IdToken, useAuth0 } from '@auth0/auth0-react';
-import { useUser } from '@auth0/nextjs-auth0/client';
-
+import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
 import { InfoButton } from "@/components/InfoButton";
 import { AsymetricCryptoUtilsImpl } from "@/utils/AsymetricCryptoUtil";
-import { dummyMessages } from "@/utils/dummy";
 import { EncryptedData, SymmetricCryptoUtils } from "@/utils/SymmetricCryptoUtil";
 import { ToastContainer, toast } from 'react-toastify';
-import { useRouter } from 'next/navigation';
 import { verifyIdToken } from '@/utils/verifyIdToken';
+import * as Ably from 'ably';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: "#ffffff",
@@ -57,8 +51,7 @@ const ChatApp = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const peerId = urlParams.get("peerId");
 
-  const { logout, user, isLoading: isLoadingUser, getIdTokenClaims } = useAuth0();
-  // const { user, isLoading: isLoadingUser } = useUser();
+  const { user, isLoading: isLoadingUser, getIdTokenClaims } = useAuth0();
 
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [isDataChannelOpen, setIsDataChannelOpen] = useState(false);
@@ -148,13 +141,14 @@ const ChatApp = () => {
     }
   }, [dataChannel, addMessage, setPeerPk, setSymKey, setIsDataChannelOpen, handleChannelOpen]);
 
-  const [socket] = useState<Socket>(io());
+  const [selfId] = useState(crypto.randomUUID())
+  const [ablyClient] = useState(new Ably.Realtime({ authUrl: '/api/ably' }));
   const [rtc] = useState(new RTCPeerConnection({
     iceServers: [
-      // { urls: "stun:stunserver2024.stunprotocol.org:3478" },
+      { urls: "stun:stunserver2024.stunprotocol.org:3478" },
       // { urls: "stun:stun.l.google.com:19302" },
       // { urls: "stun:stun.l.google.com:5349" },
-      { urls: "stun:stun1.l.google.com:3478" },
+      // { urls: "stun:stun1.l.google.com:3478" },
       // { urls: "stun:stun1.l.google.com:5349" },
       // { urls: "stun:stun2.l.google.com:19302" },
       // { urls: "stun:stun2.l.google.com:5349" },
@@ -168,76 +162,108 @@ const ChatApp = () => {
 
   const [otherUser, setOtherUser] = useState<string | null>(null);
   useEffect(() => {
-    const onConnect = () => {
-      socket.on("rtc:offer", async ({ from, payload }) => {
-        const { offer, idToken } = payload;
-        const { valid, payload: { nickname, email } } = await verifyIdToken(idToken.__raw)
-        if (!valid) return
-        
-        await rtc.setRemoteDescription(offer);
-        toast(
-          ({ closeToast })=> (
-            <Stack>
-              <Box>{email || nickname || ""} would like to connect</Box>
-              <Box display={"flex"} justifyContent={"flex-end"}>
-                <Button size='small' variant='outlined' color='success' onClick={async () => {
-                  console.log("offer: ", offer)
-                  const answer = await rtc.createAnswer();
-                  await rtc.setLocalDescription(answer);
-                  socket.emit("rtc:answer", { to: from, payload: answer });
-                  setOtherUser(email || nickname || "")
-                  closeToast();
-                }}>Accept</Button>
-                <Box mr={1}></Box>
-                <Button size='small' variant='outlined' color='error' onClick={async () => {
-                  socket.emit("rtc:deny", { to: from });
-                  closeToast();
-                }}>Deny</Button>
-              </Box>
-            </Stack>
-          ),
-          { autoClose: false, closeButton: () => null }
-        )
-      })
-      socket.on("rtc:answer", async ({ from, payload: answer }) => {
-        console.log(`received answer from ${from}: `, answer)
-        await rtc.setRemoteDescription(answer);
-      })
-      socket.on("rtc:ice", async ({ from, payload: candidate }) => {
-        console.log(`received candidate from ${from}: `, candidate)
-        candidate && await rtc.addIceCandidate(candidate);
-      })
-      socket.on("rtc:deny", async () => {
-        toast.error("Your connection request was denied.")
-      })
+    const signalingChannel = ablyClient.channels.get(`signaling:${selfId}`);
 
-      !!peerId && initiateIceOffer(peerId)
-      setIsSocketConnected(true);
-    }
+    // Keep track of pending offers
+    const pendingOffers: {[k: string]: {
+      offer: RTCSessionDescriptionInit | null,
+      iceCandidates: RTCIceCandidate[]
+    }} = {}
 
-    const initiateIceOffer = async (peerId: string) => {
-      setDataChannel(rtc.createDataChannel("chatChannel"))
-
-      rtc.onicecandidate = event => {
-        event.candidate && socket.emit("rtc:ice", { to: peerId, payload: event.candidate });
+    const listener: Ably.messageCallback<Ably.InboundMessage> = async ({ data: { from, payload }, name }) => {
+      const targetAblyChannel = ablyClient.channels.get(`signaling:${from}`)
+      pendingOffers[from] = pendingOffers[from] || {
+        offer: null,
+        iceCandidates: []
       }
 
-      const offer = await rtc.createOffer();
-      socket.emit("rtc:offer", { to: peerId, payload: { offer, idToken: await getIdTokenClaims() } });
-      await rtc.setLocalDescription(offer);
+      const attemptCompleteConnection = async (peerId: string) => {
+        // setRemoteDescription has to be called before addIceCandidate
+        const pendingOffer = pendingOffers[peerId];
+        if (!!pendingOffer.iceCandidates.length && !!pendingOffer.offer) {
+          await rtc.setRemoteDescription(pendingOffer.offer)
+          for (const candidate of pendingOffer.iceCandidates) {
+            await rtc.addIceCandidate(candidate)
+          }
+          delete pendingOffers[peerId]
+        }
+      }
+
+      switch (name as "rtc:offer" | "rtc:answer" | "rtc:ice" | "rtc:deny") {
+        case "rtc:offer":
+
+          const { offer, idToken } = payload;
+          const { valid, payload: { nickname, email } } = await verifyIdToken(idToken.__raw)
+          if (!valid) return
+
+          toast(
+            ({ closeToast }) => (
+              <Stack>
+                <Box>{email || nickname || ""} would like to connect</Box>
+                <Box display={"flex"} justifyContent={"flex-end"}>
+                  <Button size='small' variant='outlined' color='success' onClick={async () => {
+                    pendingOffers[from].offer = offer
+                    await attemptCompleteConnection(from);
+                    const answer = await rtc.createAnswer();
+                    await rtc.setLocalDescription(answer);
+                    targetAblyChannel.publish("rtc:answer", { from, payload: answer })
+                    setOtherUser(email || nickname || "")
+                    closeToast();
+                  }}>Accept</Button>
+                  <Box mr={1}></Box>
+                  <Button size='small' variant='outlined' color='error' onClick={async () => {
+                    targetAblyChannel.publish("rtc:deny", { from })
+                    closeToast();
+                  }}>Deny</Button>
+                </Box>
+              </Stack>
+            ),
+            { autoClose: false, closeButton: () => null }
+          )
+          break;
+
+        case "rtc:answer":
+          console.log(`received answer from ${from}: `, payload)
+          await rtc.setRemoteDescription(payload);
+          break;
+
+        case "rtc:ice":
+          console.log(`received candidate from ${from}: `, payload)
+          pendingOffers[from].iceCandidates.push(payload)
+          await attemptCompleteConnection(from)
+          break;
+
+        case "rtc:deny":
+          toast.error("Your connection request was denied.")
+          break;
+      }
     }
 
-    function onDisconnect() {
-      setIsSocketConnected(false);
+    const init = async () => {
+      if (!!peerId) {
+        const peerSignalingChannel = ablyClient.channels.get(`signaling:${peerId}`)
+
+        setDataChannel(rtc.createDataChannel("chatChannel"))
+
+        rtc.onicecandidate = async event => {
+          event.candidate && await peerSignalingChannel.publish("rtc:ice", { from: selfId, payload: event.candidate });
+        }
+
+        const offer = await rtc.createOffer();
+        await rtc.setLocalDescription(offer);
+        await peerSignalingChannel.publish("rtc:offer", { from: selfId, payload: { offer, idToken: await getIdTokenClaims() } });
+      }
+      await signalingChannel.subscribe(listener)
+      setIsSocketConnected(true)
     }
 
-    socket.on("connect", onConnect);
-    socket.on("disconnect", onDisconnect);
-    return () => {
-      socket.off("connect", onConnect);
-      socket.off("disconnect", onDisconnect);
-    };
-  }, [socket, rtc]);
+    init();
+
+    return () => signalingChannel.unsubscribe(listener)
+
+  }, [ablyClient, rtc]);
+
+
   useEffect(() => {
     rtc.ondatachannel = event => {
       console.log("rtc.ondatachannel: ", event)
@@ -262,7 +288,7 @@ const ChatApp = () => {
     }
   }
 
-  const sessionUrl = `${window.location.origin}/?peerId=${socket?.id}`;
+  const sessionUrl = `${window.location.origin}/?peerId=${selfId}`;
 
   // console.log("====================")
   // console.log("isDataChannelOpen: ", isDataChannelOpen)
@@ -307,16 +333,6 @@ const Login = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!isLoading && !user) loginWithRedirect()
   }, [user, isLoading]);
-
-  // const { user, isLoading } = useUser();
-  // const router = useRouter();
-  // const peerId = new URLSearchParams(window.location.search).get("peerId");
-  // useEffect(() => {
-  //   if (!isLoading && !user) {
-  //     if (!peerId) router.replace("/api/auth/login")
-  //     else router.replace(`/api/auth/login?peerId=${peerId}`)
-  //   }
-  // }, [user, isLoading]);
 
   if (isLoading) return <h1>Loading...</h1>
   return (!isLoading && !!user && children)
