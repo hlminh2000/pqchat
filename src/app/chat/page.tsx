@@ -37,10 +37,13 @@ const useSortedMessages = () => {
 const asymCryptoUtil = new AsymetricCryptoUtilsImpl();
 const symCryptoUtil = new SymmetricCryptoUtils();
 
-const ChatApp = () => {
-
+const getPeerId = () => {
   const urlParams = new URLSearchParams(window.location.search);
-  const peerId = urlParams.get("peerId");
+  return urlParams.get("peerId");
+}
+
+const ChatApp = () => {
+  const peerId = getPeerId();
 
   const { user, isLoading: isLoadingUser, getIdTokenClaims, logout } = useAuth0();
 
@@ -338,12 +341,15 @@ const ChatApp = () => {
 
 const Login = ({ children }: { children: ReactNode }) => {
   const { loginWithRedirect, user, isLoading } = useAuth0();
+  const peerId = getPeerId();
 
   useEffect(() => {
-    console.log("isLoading: ", isLoading)
-    console.log("user: ", user)
     if (!isLoading && !user) loginWithRedirect({
-      authorizationParams: { redirect_uri: `${window.location.origin}/chat` }
+      authorizationParams: { 
+        redirect_uri: peerId 
+          ? `${window.location.origin}/chat?peerId=${peerId}` 
+          : `${window.location.origin}/chat` 
+      }
     })
   }, [user, isLoading]);
 
@@ -352,21 +358,10 @@ const Login = ({ children }: { children: ReactNode }) => {
 }
 
 function Page() {
-
-  const peerId = new URLSearchParams(window.location.search).get("peerId");
-
   return (
     <Auth0Provider
       domain="dev-48o35gs7coyf2b7q.us.auth0.com"
       clientId="9oVYYrTOPB4nkUcCFv1AkD99UacrXKqH"
-      onRedirectCallback={() => {
-        console.log("onRedirectCallback")
-      }}
-      authorizationParams={{
-        redirect_uri: peerId
-          ? `${window.location.origin}/chat?peerId=${peerId}`
-          : `${window.location.origin}/chat`
-      }}
     >
       <ToastContainer />
       <Login>
