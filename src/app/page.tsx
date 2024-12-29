@@ -2,16 +2,21 @@
 import dynamic from 'next/dynamic'
 
 import { io, Socket } from "Socket.IO-client";
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ReactNode, use, useEffect, useMemo, useState } from "react";
 import { AppBar, Box, Button, Stack, styled, Toolbar } from "@mui/material";
 import ChatUI, { ChatMessage } from "@/components/chatui";
 import dayjs from "dayjs";
-import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
+
+import { Auth0Provider, IdToken, useAuth0 } from '@auth0/auth0-react';
+import { useUser } from '@auth0/nextjs-auth0/client';
+
 import { InfoButton } from "@/components/InfoButton";
 import { AsymetricCryptoUtilsImpl } from "@/utils/AsymetricCryptoUtil";
 import { dummyMessages } from "@/utils/dummy";
 import { EncryptedData, SymmetricCryptoUtils } from "@/utils/SymmetricCryptoUtil";
 import { ToastContainer, toast } from 'react-toastify';
+import { useRouter } from 'next/navigation';
+import { verifyIdToken } from '@/utils/verifyIdToken';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: "#ffffff",
@@ -52,7 +57,9 @@ const ChatApp = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const peerId = urlParams.get("peerId");
 
-  const { logout, user, isLoading: isLoadingUser } = useAuth0();
+  const { logout, user, isLoading: isLoadingUser, getIdTokenClaims } = useAuth0();
+  // const { user, isLoading: isLoadingUser } = useUser();
+
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [isDataChannelOpen, setIsDataChannelOpen] = useState(false);
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
@@ -98,6 +105,7 @@ const ChatApp = () => {
   /********************************************************************************/
 
   const handleChannelOpen = () => {
+    console.log("channel open!")
     const keys = keypair.keys
     if (!keys) return
 
@@ -161,19 +169,23 @@ const ChatApp = () => {
   const [otherUser, setOtherUser] = useState<string | null>(null);
   useEffect(() => {
     const onConnect = () => {
-      socket.on("rtc:offer", async ({ from, payload: { offer, email } }) => {
+      socket.on("rtc:offer", async ({ from, payload }) => {
+        const { offer, idToken } = payload;
+        const { valid, payload: { nickname, email } } = await verifyIdToken(idToken.__raw)
+        if (!valid) return
+        
         await rtc.setRemoteDescription(offer);
         toast(
           ({ closeToast })=> (
             <Stack>
-              <Box>{email} would like to connect</Box>
+              <Box>{email || nickname || ""} would like to connect</Box>
               <Box display={"flex"} justifyContent={"flex-end"}>
                 <Button size='small' variant='outlined' color='success' onClick={async () => {
                   console.log("offer: ", offer)
                   const answer = await rtc.createAnswer();
                   await rtc.setLocalDescription(answer);
                   socket.emit("rtc:answer", { to: from, payload: answer });
-                  setOtherUser(email)
+                  setOtherUser(email || nickname || "")
                   closeToast();
                 }}>Accept</Button>
                 <Box mr={1}></Box>
@@ -211,7 +223,7 @@ const ChatApp = () => {
       }
 
       const offer = await rtc.createOffer();
-      socket.emit("rtc:offer", { to: peerId, payload: { offer, email: user?.email } });
+      socket.emit("rtc:offer", { to: peerId, payload: { offer, idToken: await getIdTokenClaims() } });
       await rtc.setLocalDescription(offer);
     }
 
@@ -268,9 +280,13 @@ const ChatApp = () => {
                 {!peerId && <InfoButton sessionUrl={sessionUrl} />}
               </Box>
               <Box flex={1}></Box>
-              {!isLoadingUser && !!user && <Button size="small" onClick={async () => {
-                await logout()
-              }}>Logout</Button>}
+              {!isLoadingUser && !!user && (
+                <a href='/api/auth/logout'>
+                  <Button size="small" onClick={async () => {
+                    // await logout()
+                  }}>Logout</Button>
+                </a>
+              )}
             </Toolbar>
           </StyledAppBar>
           <ChatUI 
@@ -292,12 +308,18 @@ const Login = ({ children }: { children: ReactNode }) => {
     if (!isLoading && !user) loginWithRedirect()
   }, [user, isLoading]);
 
+  // const { user, isLoading } = useUser();
+  // const router = useRouter();
+  // const peerId = new URLSearchParams(window.location.search).get("peerId");
+  // useEffect(() => {
+  //   if (!isLoading && !user) {
+  //     if (!peerId) router.replace("/api/auth/login")
+  //     else router.replace(`/api/auth/login?peerId=${peerId}`)
+  //   }
+  // }, [user, isLoading]);
+
   if (isLoading) return <h1>Loading...</h1>
-  return (
-    <Box>
-      {!isLoading && !!user && children}
-    </Box>
-  )
+  return (!isLoading && !!user && children)
 }
 
 function Home() {
