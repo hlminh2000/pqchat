@@ -1,4 +1,4 @@
-import { Box, Button, IconButton, styled, Tooltip, Typography, tooltipClasses, TooltipProps } from "@mui/material";
+import { Box, Button, IconButton, styled, Tooltip, Typography, tooltipClasses, TooltipProps, useTheme } from "@mui/material";
 import { useEffect, useState } from "react";
 import { BiInfoCircle } from "react-icons/bi";
 import { CopyToClipboard } from "react-copy-to-clipboard";
@@ -25,6 +25,7 @@ export const InfoButton = (props: { sessionUrl: string }) => {
     }, 500)
     return () => clearTimeout(timeout)
   }, [])
+  const theme = useTheme();
   return (
     <StyledTooltip open={open} arrow title={
       <Box>
@@ -37,7 +38,7 @@ export const InfoButton = (props: { sessionUrl: string }) => {
           <Typography> <strong>Chat link:</strong> {props.sessionUrl}</Typography>
           <Box mt={1}>
             <CopyToClipboard text={props.sessionUrl} onCopy={() => setOpen(false)}>
-              <Button variant="outlined" size="small" color="white">Copy</Button>
+              <Button variant="outlined" size="small" sx={{color: "white"}}>Copy</Button>
             </CopyToClipboard>
           </Box>
         </Box>

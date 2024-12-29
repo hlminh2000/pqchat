@@ -67,7 +67,7 @@ export class SymmetricCryptoUtils {
 
     return {
       ciphertext: this.bufferToBase64(encryptedData),
-      iv: this.bufferToBase64(iv)
+      iv: this.bufferToBase64(iv.buffer)
     };
   }
 
