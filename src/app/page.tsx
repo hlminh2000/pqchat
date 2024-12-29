@@ -51,7 +51,7 @@ const ChatApp = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const peerId = urlParams.get("peerId");
 
-  const { user, isLoading: isLoadingUser, getIdTokenClaims } = useAuth0();
+  const { user, isLoading: isLoadingUser, getIdTokenClaims, logout } = useAuth0();
 
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [isDataChannelOpen, setIsDataChannelOpen] = useState(false);
@@ -142,7 +142,6 @@ const ChatApp = () => {
   }, [dataChannel, addMessage, setPeerPk, setSymKey, setIsDataChannelOpen, handleChannelOpen]);
 
   const [selfId] = useState(crypto.randomUUID())
-  const [ablyClient] = useState(new Ably.Realtime({ authUrl: '/api/ably' }));
   const [rtc] = useState(new RTCPeerConnection({
     iceServers: [
       { urls: "stun:stunserver2024.stunprotocol.org:3478" },
@@ -162,6 +161,7 @@ const ChatApp = () => {
 
   const [otherUser, setOtherUser] = useState<string | null>(null);
   useEffect(() => {
+    const ablyClient = new Ably.Realtime({ authUrl: '/api/ably' })
     const signalingChannel = ablyClient.channels.get(`signaling:${selfId}`);
 
     // Keep track of pending offers
@@ -261,7 +261,7 @@ const ChatApp = () => {
 
     return () => signalingChannel.unsubscribe(listener)
 
-  }, [ablyClient, rtc]);
+  }, [rtc]);
 
 
   useEffect(() => {
@@ -290,12 +290,13 @@ const ChatApp = () => {
 
   const sessionUrl = `${window.location.origin}/?peerId=${selfId}`;
 
-  // console.log("====================")
-  // console.log("isDataChannelOpen: ", isDataChannelOpen)
-  // console.log("peerPk: ", peerPk)
-  // console.log("keypair.keys: ", keypair.keys)
-  // console.log("sharedSecret: ", sharedSecret)
-  // console.log("isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret: ", isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret)
+  console.log("====================")
+  console.log("isDataChannelOpen: ", isDataChannelOpen)
+  console.log("peerPk: ", peerPk)
+  console.log("keypair.keys: ", keypair.keys)
+  console.log("sharedSecret: ", sharedSecret)
+  console.log("isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret: ", isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret)
+  console.log("====================")
   return (
     <main>
       {isSocketConnected && (
@@ -307,11 +308,9 @@ const ChatApp = () => {
               </Box>
               <Box flex={1}></Box>
               {!isLoadingUser && !!user && (
-                <a href='/api/auth/logout'>
-                  <Button size="small" onClick={async () => {
-                    // await logout()
-                  }}>Logout</Button>
-                </a>
+                <Button size="small" onClick={async () => {
+                  await logout()
+                }}>Logout</Button>
               )}
             </Toolbar>
           </StyledAppBar>
