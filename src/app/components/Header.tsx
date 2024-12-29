@@ -12,23 +12,28 @@ export default function Header() {
   return (
     <AppBar position="static" color="default" elevation={1}>
       <Toolbar>
-        <Box display="flex" alignItems="center" flexGrow={1}>
-          <Lock sx={{ mr: 1, color: 'primary.main' }} />
-          <Typography variant="h6" component="div" color="text.primary">
-            EphemeralChat
-          </Typography>
-        </Box>
-        <Box>
-          <Link href="#features" color="text.secondary" sx={{ mx: 2 }}>
-            Features
-          </Link>
-          <Link href="#how-it-works" color="text.secondary" sx={{ mx: 2 }}>
-            How It Works
-          </Link>
-          <Button variant="contained" color="primary" onClick={() => router.push("/chat")}>
-            Start Chatting
-          </Button>
-        </Box>
+      <Box display="flex" alignItems="center" flexGrow={1}>
+        <Lock sx={{ mr: 1, color: 'primary.main' }} />
+        <Typography variant="h6" component="div" color="text.primary">
+        EphemChat
+        </Typography>
+      </Box>
+      <Box alignItems="center" display={{ xs: 'none', md: 'flex' }}>
+        <Link href="#features" color="text.secondary" sx={{ mx: 2 }}>
+        Features
+        </Link>
+        <Link href="#how-it-works" color="text.secondary" sx={{ mx: 2 }}>
+        How It Works
+        </Link>
+        <Button variant="contained" color="primary" onClick={() => router.push("/chat")}>
+        Start Chatting
+        </Button>
+      </Box>
+      <Box alignItems="center" display={{ xs: 'flex', md: 'none' }}>
+        <Button variant="contained" color="primary" onClick={() => router.push("/chat")}>
+        Chat
+        </Button>
+      </Box>
       </Toolbar>
     </AppBar>
   )
