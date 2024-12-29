@@ -204,9 +204,9 @@ const ChatApp = () => {
                     pendingOffers[from].offer = offer
                     await attemptCompleteConnection(from);
                     const answer = await rtc.createAnswer();
-                    const idtoken = await getIdTokenClaims();
+                    const idToken = await getIdTokenClaims();
                     await rtc.setLocalDescription(answer);
-                    targetAblyChannel.publish("rtc:answer", { from, payload: { answer, idtoken } })
+                    targetAblyChannel.publish("rtc:answer", { from, payload: { answer, idToken } })
                     setOtherUser(userData)
                     closeToast();
                   }}>Accept</Button>
