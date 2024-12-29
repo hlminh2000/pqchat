@@ -109,6 +109,11 @@ const ChatApp = () => {
   }
 
   useEffect(() => {
+    window.onbeforeunload = () => "This chat will no longer be accessible"
+    return () => { window.onbeforeunload = null }
+  }, [])
+
+  useEffect(() => {
     if (dataChannel?.readyState === "open") {
       handleChannelOpen()
     }
