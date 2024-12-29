@@ -11,6 +11,7 @@ import { EncryptedData, SymmetricCryptoUtils } from "@/utils/SymmetricCryptoUtil
 import { ToastContainer, toast } from 'react-toastify';
 import { verifyIdToken } from '@/utils/verifyIdToken';
 import * as Ably from 'ably';
+import { LoadingOverlay } from '@/components/LoadingOverlay';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: "#ffffff",
@@ -61,7 +62,7 @@ const ChatApp = () => {
   const keypair = useAsymKeypairs();
   const [peerPk, setPeerPk] = useState<CryptoKey | null>(null);
 
-  const [sharedSecret, setSymKey] = useState<CryptoKey | null>(null)
+  const [sharedSecret, setSharedSecret] = useState<CryptoKey | null>(null)
 
   type SerializedRtcMessage = { type: "pk", data: JsonWebKey }
     | { type: "sharedSecret", data: string }  // encrypted cipher
@@ -85,16 +86,16 @@ const ChatApp = () => {
   /** When the peerkPk is available, optionally generate and send shared secret **/
   useEffect(() => {
     (async () => {
-      if (!peerId && !!peerPk){  // Elect the host to establish shared symetric key
+      if (!peerId && !!peerPk) {  // Elect the host to establish shared symetric key
         const symKey = await symCryptoUtil.generateKey()
-        setSymKey(symKey.key)
-        sendRtcMessage({ 
-          type: "sharedSecret", 
+        setSharedSecret(symKey.key)
+        sendRtcMessage({
+          type: "sharedSecret",
           data: symKey.exportedKey
         })
       }
     })()
-  }, [peerPk])
+  }, [peerPk, dataChannel])
   /********************************************************************************/
 
   const handleChannelOpen = () => {
@@ -106,7 +107,7 @@ const ChatApp = () => {
     setIsDataChannelOpen(true);
     toast.info("The session has started")
   }
- 
+
   useEffect(() => {
     if (dataChannel?.readyState === "open") {
       handleChannelOpen()
@@ -133,13 +134,13 @@ const ChatApp = () => {
       } else if (rtcMessage.type === "sharedSecret" && privateKey) {
         const decryptedSharedSecret = JSON.parse(await asymCryptoUtil.decrypt(rtcMessage.data, privateKey)) as JsonWebKey
         const symetricKey = await symCryptoUtil.importKey(decryptedSharedSecret)
-        setSymKey(symetricKey)
+        setSharedSecret(symetricKey)
       }
     };
     dataChannel.onopen = () => {
       handleChannelOpen()
     }
-  }, [dataChannel, addMessage, setPeerPk, setSymKey, setIsDataChannelOpen, handleChannelOpen]);
+  }, [dataChannel, addMessage, setPeerPk, setSharedSecret, setIsDataChannelOpen, handleChannelOpen]);
 
   const [selfId] = useState(crypto.randomUUID())
   const [rtc] = useState(new RTCPeerConnection({
@@ -165,10 +166,12 @@ const ChatApp = () => {
     const signalingChannel = ablyClient.channels.get(`signaling:${selfId}`);
 
     // Keep track of pending offers
-    const pendingOffers: {[k: string]: {
-      offer: RTCSessionDescriptionInit | null,
-      iceCandidates: RTCIceCandidate[]
-    }} = {}
+    const pendingOffers: {
+      [k: string]: {
+        offer: RTCSessionDescriptionInit | null,
+        iceCandidates: RTCIceCandidate[]
+      }
+    } = {}
 
     const listener: Ably.messageCallback<Ably.InboundMessage> = async ({ data: { from, payload }, name }) => {
       const targetAblyChannel = ablyClient.channels.get(`signaling:${from}`)
@@ -198,9 +201,9 @@ const ChatApp = () => {
 
           toast(
             ({ closeToast }) => (
-              <Stack>
+              <Stack flex={1}>
                 <Box>{email || nickname || ""} would like to connect</Box>
-                <Box display={"flex"} justifyContent={"flex-end"}>
+                <Box mt={1} display={"flex"} justifyContent={"flex-end"}>
                   <Button size='small' variant='outlined' color='success' onClick={async () => {
                     pendingOffers[from].offer = offer
                     await attemptCompleteConnection(from);
@@ -299,29 +302,27 @@ const ChatApp = () => {
   console.log("====================")
   return (
     <main>
-      {isSocketConnected && (
-        <Box p={0} display={"flex"} flexDirection={"column"} height={"100vh"}>
-          <StyledAppBar position="sticky">
-            <Toolbar variant="dense">
-              <Box flex={1}>
-                {!peerId && <InfoButton sessionUrl={sessionUrl} />}
-              </Box>
-              <Box flex={1}></Box>
-              {!isLoadingUser && !!user && (
-                <Button size="small" onClick={async () => {
-                  await logout()
-                }}>Logout</Button>
-              )}
-            </Toolbar>
-          </StyledAppBar>
-          <ChatUI 
-            messages={messages}
-            sendMessage={sendChatMessage}
-            enabled={isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret} 
-          />
-        </Box>
-      )}
-      {!isSocketConnected && <h1>Connecting...</h1>}
+      <Box p={0} display={"flex"} flexDirection={"column"} height={"100vh"}>
+        <StyledAppBar position="sticky">
+          <Toolbar variant="dense">
+            <Box flex={1}>
+              {isSocketConnected && !peerId && <InfoButton sessionUrl={sessionUrl} />}
+            </Box>
+            <Box flex={1}></Box>
+            {!isLoadingUser && !!user && (
+              <Button size="small" onClick={async () => {
+                await logout()
+              }}>Logout</Button>
+            )}
+          </Toolbar>
+        </StyledAppBar>
+        <ChatUI
+          messages={messages}
+          sendMessage={sendChatMessage}
+          enabled={isDataChannelOpen && !!peerPk && !!keypair.keys && !!sharedSecret}
+        />
+      </Box>
+      <LoadingOverlay open={!isSocketConnected} message={"Connecting"} />
     </main>
   )
 }
@@ -333,7 +334,7 @@ const Login = ({ children }: { children: ReactNode }) => {
     if (!isLoading && !user) loginWithRedirect()
   }, [user, isLoading]);
 
-  if (isLoading) return <h1>Loading...</h1>
+  if (isLoading) return <LoadingOverlay open message='Logging in' />
   return (!isLoading && !!user && children)
 }
 
@@ -354,7 +355,7 @@ function Home() {
           : `${window.location.origin}/`
       }}
     >
-      <ToastContainer  />
+      <ToastContainer />
       <Login>
         <ChatApp />
       </Login>
@@ -362,4 +363,4 @@ function Home() {
   );
 }
 
-export default dynamic(() => Promise.resolve(Home), {ssr: false})
+export default dynamic(() => Promise.resolve(Home), { ssr: false })
