@@ -12,6 +12,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import { verifyIdToken } from '@/utils/verifyIdToken';
 import * as Ably from 'ably';
 import { LoadingOverlay } from '@/app/chat/components/LoadingOverlay';
+import { AddCircleOutline } from '@mui/icons-material';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: "#ffffff",
@@ -186,7 +187,7 @@ const ChatApp = () => {
 
           const { offer, idToken } = payload;
           const { valid, payload: userData } = await verifyIdToken(idToken.__raw)
-          const issuedAt = dayjs((userData?.iat||0) * 1000)
+          const issuedAt = dayjs((userData?.iat || 0) * 1000)
           if (issuedAt.isBefore(dayjs().subtract(1, "hour"))) {
             console.log("identity too old")
             return
@@ -303,13 +304,18 @@ const ChatApp = () => {
         <StyledAppBar position="sticky">
           <Toolbar variant="dense">
             <Box flex={1}>
-              {isSocketConnected && !peerId && <InfoButton sessionUrl={sessionUrl} />}
-              <a href='/chat' target='_blank'><Button>New Chat</Button></a>
+              {isSocketConnected && !peerId && (
+                <Box mr={2} display={"inline"}>
+                  <InfoButton sessionUrl={sessionUrl} />
+                </Box>
+              )}
+
+              <a href='/chat' target='_blank'><Button variant='outlined' size="small" startIcon={<AddCircleOutline />}>New Chat</Button></a>
             </Box>
             <Box flex={1}></Box>
             {!isLoadingUser && !!user && (
               <Button size="small" onClick={async () => {
-                await logout({logoutParams: { returnTo: window.location.origin }})
+                await logout({ logoutParams: { returnTo: window.location.origin } })
               }}>Logout</Button>
             )}
           </Toolbar>
@@ -333,7 +339,7 @@ const Login = ({ children }: { children: ReactNode }) => {
     console.log("isLoading: ", isLoading)
     console.log("user: ", user)
     if (!isLoading && !user) loginWithRedirect({
-      authorizationParams: {redirect_uri: `${window.location.origin}/chat`}
+      authorizationParams: { redirect_uri: `${window.location.origin}/chat` }
     })
   }, [user, isLoading]);
 
