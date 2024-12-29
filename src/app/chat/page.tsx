@@ -320,7 +320,7 @@ const ChatApp = () => {
             <Box flex={1}></Box>
             {!isLoadingUser && !!user && (
               <Button size="small" onClick={async () => {
-                await logout()
+                await logout({logoutParams: { returnTo: window.location.origin }})
               }}>Logout</Button>
             )}
           </Toolbar>
@@ -343,7 +343,9 @@ const Login = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     console.log("isLoading: ", isLoading)
     console.log("user: ", user)
-    if (!isLoading && !user) loginWithRedirect()
+    if (!isLoading && !user) loginWithRedirect({
+      authorizationParams: {redirect_uri: `${window.location.origin}/chat`}
+    })
   }, [user, isLoading]);
 
   if (isLoading) return <LoadingOverlay open message='Logging in' />
