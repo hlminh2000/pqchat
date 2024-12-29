@@ -197,7 +197,7 @@ const ChatApp = () => {
 
           const { offer, idToken } = payload;
           const { valid, payload: userData } = await verifyIdToken(idToken.__raw)
-          const issuedAt = dayjs(userData.iat*1000)
+          const issuedAt = dayjs((userData?.iat||0) * 1000)
           if (issuedAt.isBefore(dayjs().subtract(1, "hour"))) {
             console.log("identity too old")
             return
