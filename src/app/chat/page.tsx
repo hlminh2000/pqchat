@@ -110,22 +110,12 @@ const ChatApp = () => {
     const [pk, sk] = await kemKeypair
     const pkString: string = pk ? uintArrayToB64(pk) : ""
     await sendRtcMessage({ type: "pk", data: { pk: pkString } })
+    setupDatachannelMessageHandler()
     setIsDataChannelOpen(true);
   }
 
-  useEffect(() => {
-    if (dataChannel?.readyState === "open") {
-      handleChannelOpen()
-    }
-  }, [dataChannel])
-
-  useEffect(() => {
-    if (!dataChannel) return;
-
-    dataChannel.onclose = event => {
-      setIsDataChannelOpen(false);
-      toast(`${otherUser?.email || otherUser?.nickname} has left`)
-    }
+  const setupDatachannelMessageHandler = () => {
+    if (!dataChannel) return
     dataChannel.onmessage = async event => {
       console.log("rtc message: ", event.data)
       const rtcMessage: SerializedRtcMessage = JSON.parse(event.data);
@@ -141,6 +131,22 @@ const ChatApp = () => {
         setKemCt(b64ToUintArray(kemCt))
       }
     };
+  }
+
+  useEffect(() => {
+    if (dataChannel?.readyState === "open") {
+      handleChannelOpen()
+    }
+  }, [dataChannel])
+
+  useEffect(() => {
+    if (!dataChannel) return;
+
+    dataChannel.onclose = event => {
+      setIsDataChannelOpen(false);
+      toast(`${otherUser?.email || otherUser?.nickname} has left`)
+    }
+    setupDatachannelMessageHandler()
     dataChannel.onopen = () => {
       handleChannelOpen()
     }
