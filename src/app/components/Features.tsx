@@ -60,7 +60,7 @@ export default function Features() {
             </Typography>
             <Box mt={2}>
               <Typography variant="body1" color="grey-200">
-                Your AES-256 encryption key is exchanged with NIST-compliant CRYSTALS-Kyber Key Encapsulation Mechanism
+                Your AES-256 encryption key is exchanged using NIST-compliant CRYSTALS-Kyber Key Encapsulation Mechanism
               </Typography>
             </Box>
           </Box>
