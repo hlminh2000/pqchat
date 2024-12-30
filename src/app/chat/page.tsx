@@ -106,6 +106,7 @@ const ChatApp = () => {
   const handleChannelOpen = (dataChannel: RTCDataChannel) => async () => {
     console.log("channel open!")
     dataChannel.onmessage = handleDataChannelMessage
+    await new Promise(resolve => setTimeout(resolve, 1000)) // wait for a second to ensure the other side is ready
     const [pk, sk] = await kemKeypair
     const pkString: string = pk ? uintArrayToB64(pk) : ""
     await sendRtcMessage({ type: "pk", data: { pk: pkString } })
