@@ -214,21 +214,29 @@ const ChatApp = () => {
               <Stack flex={1}>
                 <Box>{email || nickname || ""} would like to connect</Box>
                 <Box mt={1} display={"flex"} justifyContent={"flex-end"}>
-                  <Button size='small' variant='contained' color='primary' onClick={async () => {
-                    pendingOffers[from].offer = offer
-                    await attemptCompleteConnection(from);
-                    const answer = await rtc.createAnswer();
-                    const idToken = await getIdTokenClaims();
-                    await rtc.setLocalDescription(answer);
-                    targetAblyChannel.publish("rtc:answer", { from, payload: { answer, idToken } })
-                    setOtherUser(userData)
-                    closeToast();
-                  }}>Accept</Button>
+                  <Button
+                    size='small' variant='outlined'
+                    // @ts-ignore
+                    color='primary.contrastText'
+                    onClick={async () => {
+                      pendingOffers[from].offer = offer
+                      await attemptCompleteConnection(from);
+                      const answer = await rtc.createAnswer();
+                      const idToken = await getIdTokenClaims();
+                      await rtc.setLocalDescription(answer);
+                      targetAblyChannel.publish("rtc:answer", { from, payload: { answer, idToken } })
+                      setOtherUser(userData)
+                      closeToast();
+                    }}>Accept</Button>
                   <Box mr={1}></Box>
-                  <Button size='small' variant='outlined' color='primary' onClick={async () => {
-                    targetAblyChannel.publish("rtc:deny", { from })
-                    closeToast();
-                  }}>Deny</Button>
+                  <Button
+                    size='small' variant='text'
+                    // @ts-ignore
+                    color='primary.contrastText'
+                    onClick={async () => {
+                      targetAblyChannel.publish("rtc:deny", { from })
+                      closeToast();
+                    }}>Deny</Button>
                 </Box>
               </Stack>
             ),
