@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Ephem Chat",
-  description: "Ephemeral p2p chat",
+  title: "PQChat",
+  description: "Ephemeral p2p chat with PQC",
 };
 
 export default function RootLayout({

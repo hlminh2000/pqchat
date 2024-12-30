@@ -27,7 +27,7 @@ export default function CTA() {
                 }
               }}
             >
-              Launch EphemChat
+              Launch PQChat
             </Button>
           </a>
         </Box>

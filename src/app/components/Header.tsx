@@ -15,7 +15,7 @@ export default function Header() {
         <Box display="flex" alignItems="center" flexGrow={1}>
           <Lock sx={{ mr: 1, color: 'primary.main' }} />
           <Typography variant="h6" component="div" color="text.primary">
-            EphemChat
+            PQChat
           </Typography>
         </Box>
         <Box alignItems="center" display={{ xs: 'none', md: 'flex' }}>

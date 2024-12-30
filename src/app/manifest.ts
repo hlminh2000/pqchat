@@ -2,9 +2,9 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'EphemChat',
-    short_name: 'EphemChat',
-    description: 'Ephemeral, p2p, e2e encrypted chat',
+    name: 'PQChat',
+    short_name: 'PQChat',
+    description: "Ephemeral p2p chat with PQC",
     start_url: '/chat',
     display: 'standalone',
     background_color: '#ffffff',
