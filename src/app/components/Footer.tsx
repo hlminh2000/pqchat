@@ -8,15 +8,20 @@ export default function Footer() {
   return (
     <Box component="footer" sx={{ py: 6, bgcolor: 'grey.100' }}>
       <Container maxWidth="lg">
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexDirection: { xs: 'column', sm: 'row' } }}>
-          <Typography variant="body2" color="text.secondary">
-            © 2023 EphemeralChat. All rights reserved.
-          </Typography>
-          <Box sx={{ mt: { xs: 2, sm: 0 } }}>
-            <Link href="https://github.com/quantropi-minh/ephem-chat" color="inherit" sx={{ mr: 2 }}>
-              <GitHubIcon />
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: { xs: 'column', sm: 'column' } }}>
+          <Box sx={{ mt: { xs: 2, sm: 0 }, mb: 2 }}>
+            <Link href="https://github.com/quantropi-minh/ephem-chat" color="inherit">
+              <GitHubIcon/>
             </Link>
           </Box>
+          <Typography variant="body2" color="text.secondary">
+            {/* © 2023 EphemeralChat. All rights reserved. */}
+            made with ❤️ from Ottawa, Canada
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {/* © 2023 EphemeralChat. All rights reserved. */}
+            
+          </Typography>
         </Box>
       </Container>
     </Box>
