@@ -1,7 +1,7 @@
 "use client";
 import dynamic from 'next/dynamic'
 import { ReactNode, useEffect, useState } from "react";
-import { AppBar, Box, Button, Stack, styled, Toolbar } from "@mui/material";
+import { AppBar, Box, Button, Container, Stack, styled, Toolbar, Typography } from "@mui/material";
 import ChatUI, { ChatMessage } from "@/app/chat/components/chatui";
 import dayjs from "dayjs";
 import { IdToken, useAuth0 } from '@auth0/auth0-react';
@@ -60,7 +60,7 @@ const ChatApp = () => {
 
   useEffect(() => {
     (async () => {
-      if (!peerPqcPk) return 
+      if (!peerPqcPk) return
       if (isHost) {
         const [ct, ss] = await mlKem.encap(peerPqcPk);
         console.log("ss: ", ss)
@@ -70,10 +70,10 @@ const ChatApp = () => {
       }
     })()
   }, [peerPqcPk, setKemCt, setSS])
-  
+
   useEffect(() => {
     (async () => {
-      if (!peerPqcPk || !kemCt) return 
+      if (!peerPqcPk || !kemCt) return
       if (!isHost) {
         const [pk, sk] = await kemKeypair
         const ss = await mlKem.decap(kemCt, sk);
@@ -349,20 +349,32 @@ const ChatApp = () => {
 const Login = ({ children }: { children: ReactNode }) => {
   const { loginWithRedirect, user, isLoading } = useAuth0();
   const peerId = getPeerId()
-  useEffect(() => {
-    !isLoading && !user && loginWithRedirect({
-      authorizationParams: {
-        redirect_uri: `${window.location.origin}/chat`
-      },
-      appState: {
-        returnTo: peerId
-          ? `${window.location.origin}/chat?peerId=${peerId}`
-          : `${window.location.origin}/chat`
-      },
-    })
-  }, [user, isLoading]);
+
+  const login = () => loginWithRedirect({
+    authorizationParams: {
+      redirect_uri: `${window.location.origin}/chat`
+    },
+    appState: {
+      returnTo: peerId
+        ? `${window.location.origin}/chat?peerId=${peerId}`
+        : `${window.location.origin}/chat`
+    },
+  })
 
   if (isLoading) return <LoadingOverlay open message='Logging in' />
+  if (!isLoading && !user) return (
+    <Box display={"flex"} flexDirection={"column"} justifyContent={"center"} height={"100vh"}>
+      <Container>
+        <Box mb={2}>
+          <Typography>Please log in to let your participant know who you are.</Typography>
+          <Typography>We do not track your messages or who you talk to.</Typography>
+        </Box>
+        <Box>
+          <Button onClick={login} variant='contained' color="primary">Log in</Button>
+        </Box>
+      </Container>
+    </Box>
+  )
   return (!isLoading && !!user && children);
 }
 
