@@ -13,6 +13,7 @@ import { verifyIdToken } from '@/utils/verifyIdToken';
 import * as Ably from 'ably';
 import { LoadingOverlay } from '@/app/chat/components/LoadingOverlay';
 import { AddCircleOutline } from '@mui/icons-material';
+import { AuthProvider } from '@/common/components/AuthProvider';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: "#ffffff",
@@ -203,7 +204,7 @@ const ChatApp = () => {
               <Stack flex={1}>
                 <Box>{email || nickname || ""} would like to connect</Box>
                 <Box mt={1} display={"flex"} justifyContent={"flex-end"}>
-                  <Button size='small' variant='outlined' color='success' onClick={async () => {
+                  <Button size='small' variant='contained' color='success' onClick={async () => {
                     pendingOffers[from].offer = offer
                     await attemptCompleteConnection(from);
                     const answer = await rtc.createAnswer();
@@ -214,7 +215,7 @@ const ChatApp = () => {
                     closeToast();
                   }}>Accept</Button>
                   <Box mr={1}></Box>
-                  <Button size='small' variant='outlined' color='error' onClick={async () => {
+                  <Button size='small' variant='contained' color='error' onClick={async () => {
                     targetAblyChannel.publish("rtc:deny", { from })
                     closeToast();
                   }}>Deny</Button>
@@ -229,7 +230,7 @@ const ChatApp = () => {
           console.log(`received answer from ${from}: `, payload)
           const { answer, idToken } = payload;
           const { valid, payload: userData } = await verifyIdToken(idToken.__raw)
-          if(!valid) return
+          if (!valid) return
           setOtherUser(userData)
           await rtc.setRemoteDescription(answer);
           break;
@@ -316,12 +317,15 @@ const ChatApp = () => {
                   <InfoButton sessionUrl={sessionUrl} />
                 </Box>
               )}
-
-              <a href='/chat' target='_blank'><Button variant='outlined' size="small" startIcon={<AddCircleOutline />}>New Chat</Button></a>
+              <a href='/chat' target='_blank'>
+                <Button variant='outlined' startIcon={<AddCircleOutline />}>
+                  New Chat
+                </Button>
+              </a>
             </Box>
             <Box flex={1}></Box>
             {!isLoadingUser && !!user && (
-              <Button size="small" onClick={async () => {
+              <Button variant="outlined" color='error' onClick={async () => {
                 await logout({ logoutParams: { returnTo: window.location.origin } })
               }}>Logout</Button>
             )}
@@ -343,12 +347,16 @@ const Login = ({ children }: { children: ReactNode }) => {
   const { loginWithRedirect, user, isLoading } = useAuth0();
   const peerId = getPeerId();
 
+  console.log("window.location.origin: ", window.location.origin)
+
+  console.log("isLoading: ", isLoading)
+  console.log("user: ", user)
   useEffect(() => {
     if (!isLoading && !user) loginWithRedirect({
-      authorizationParams: { 
-        redirect_uri: peerId 
-          ? `${window.location.origin}/chat?peerId=${peerId}` 
-          : `${window.location.origin}/chat` 
+      authorizationParams: {
+        redirect_uri: peerId
+          ? `${window.location.origin}/chat?peerId=${peerId}`
+          : `${window.location.origin}/chat`
       }
     })
   }, [user, isLoading]);
@@ -359,15 +367,12 @@ const Login = ({ children }: { children: ReactNode }) => {
 
 function Page() {
   return (
-    <Auth0Provider
-      domain="dev-48o35gs7coyf2b7q.us.auth0.com"
-      clientId="9oVYYrTOPB4nkUcCFv1AkD99UacrXKqH"
-    >
+    <AuthProvider>
       <ToastContainer />
       <Login>
         <ChatApp />
       </Login>
-    </Auth0Provider>
+    </AuthProvider>
   );
 }
 

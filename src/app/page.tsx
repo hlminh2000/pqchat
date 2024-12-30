@@ -8,7 +8,7 @@ import Features from './components/Features'
 import HowItWorks from './components/HowItWorks'
 import CTA from './components/CTA'
 import Footer from './components/Footer'
-import { Auth0Provider } from '@auth0/auth0-react'
+import { AuthProvider } from '@/common/components/AuthProvider'
 
 const theme = createTheme({
   palette: {
@@ -26,10 +26,7 @@ const theme = createTheme({
 
 export default function Home() {
   return (
-    <Auth0Provider
-      domain="dev-48o35gs7coyf2b7q.us.auth0.com"
-      clientId="9oVYYrTOPB4nkUcCFv1AkD99UacrXKqH"
-    >
+    <AuthProvider>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <Header />
@@ -41,7 +38,7 @@ export default function Home() {
         </main>
         <Footer />
       </ThemeProvider>
-    </Auth0Provider>
+    </AuthProvider>
   )
 }
 
