@@ -3,26 +3,23 @@ export const uintArrayToB64 = (key: Uint8Array<ArrayBufferLike>) => btoa(String.
 
 export const b64ToUintArray = (b64encoded: string) => new Uint8Array(atob(b64encoded).split("").map(c => c.charCodeAt(0)))
 
-function getKeyMaterial(password: string) {
-  const enc = new TextEncoder();
-  return crypto.subtle.importKey(
-    "raw",
-    enc.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits", "deriveKey"],
-  );
-}
-
 export const sharedSecretToCryptoKey = async (ss: Uint8Array<ArrayBufferLike>): Promise<CryptoKey> => {
+
+  let kdk = await crypto.subtle.importKey(
+    'raw',
+    ss,
+    'HKDF',
+    false, // KDF keys cannot be exported
+    ['deriveKey', 'deriveBits']);
+
   return crypto.subtle.deriveKey(
-    {
-      name: "PBKDF2",
-      salt: ss,
-      iterations: 100000,
-      hash: "SHA-256",
+    { 
+      name: 'HKDF', 
+      salt: new Uint8Array(), 
+      info: new TextEncoder().encode("symetric key"), 
+      hash: 'SHA-256' 
     },
-    await getKeyMaterial(atob(uintArrayToB64(ss))),
+    kdk,
     { name: "AES-GCM", length: 256 },
     true,
     ["encrypt", "decrypt"],
