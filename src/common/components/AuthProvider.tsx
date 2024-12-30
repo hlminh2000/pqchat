@@ -5,7 +5,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => (
     domain="dev-48o35gs7coyf2b7q.us.auth0.com"
     clientId="9oVYYrTOPB4nkUcCFv1AkD99UacrXKqH"
     authorizationParams={{
-      redirect_uri: `${window.location.origin}/chat`
+      redirect_uri: window ? `${window.location.origin}/chat` : ""
     }}
   >
     {children}
