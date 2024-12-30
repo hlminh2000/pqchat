@@ -51,13 +51,18 @@ export default function Features() {
       <Box id="pqc" sx={{ py: 8, bgcolor: 'primary.main', color: 'primary.contrastText' }}>
         <Container maxWidth="lg">
           <Box sx={{ textAlign: 'center' }}>
-            <BiShield style={{ fontSize: 64*1.5, color: 'white', marginBottom: 2*8 }} />
+            <BiShield style={{ fontSize: 64 * 1.5, color: 'white', marginBottom: 2 * 8 }} />
             <Typography variant="h3" component="h3" gutterBottom>
               Post-Quantum Encryption
             </Typography>
-            <Typography variant="h6" color="text.contrastText">
+            <Typography variant="h5" color="text.contrastText">
               With state-of-the-art Post-Quantum Cryptography, even a quantum computer won't break into your chat.
             </Typography>
+            <Box mt={2}>
+              <Typography variant="body1" color="grey-200">
+                Your AES-256 encryption key is exchanged with NIST-compliant CRYSTALS-Kyber Key Encapsulation Mechanism
+              </Typography>
+            </Box>
           </Box>
         </Container>
       </Box>
