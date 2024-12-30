@@ -31,7 +31,7 @@ export const InfoButton = (props: { sessionUrl: string }) => {
       <Box>
         <Box px={1} pb={1} pt={1}>
           <Typography> <strong>Ephemeral chat link:</strong> {props.sessionUrl}</Typography>
-          <Box mt={1}>
+          <Box my={1}>
             <CopyToClipboard text={props.sessionUrl} onCopy={() => setOpen(false)}>
               <Button
                 variant="outlined" 
@@ -44,6 +44,7 @@ export const InfoButton = (props: { sessionUrl: string }) => {
               </Button>
             </CopyToClipboard>
           </Box>
+          <Typography> <strong>Send it to invite someone to chat. </strong></Typography>
         </Box>
       </Box>
     }>
