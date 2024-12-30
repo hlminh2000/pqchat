@@ -105,10 +105,10 @@ const ChatApp = () => {
 
   const handleChannelOpen = (dataChannel: RTCDataChannel) => async () => {
     console.log("channel open!")
+    dataChannel.onmessage = handleDataChannelMessage
     const [pk, sk] = await kemKeypair
     const pkString: string = pk ? uintArrayToB64(pk) : ""
     await sendRtcMessage({ type: "pk", data: { pk: pkString } })
-    dataChannel.onmessage = handleDataChannelMessage
     setIsDataChannelOpen(true);
   }
 
