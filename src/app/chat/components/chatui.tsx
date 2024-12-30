@@ -13,6 +13,7 @@ import { styled } from "@mui/system";
 import { IoSend } from "react-icons/io5";
 import Markdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { dark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const ChatContainer = styled(Paper)(() => ({
   flex: 1,
@@ -131,9 +132,11 @@ const ChatUI = (props: {
                     const match = /language-(\w+)/.exec(className || '')
                     return <SyntaxHighlighter
                       {...rest}
+                      style={dark}
                       customStyle={{
-                        background: "rgba(255, 255, 255, 0.9)",
-                        borderRadius: "4px",
+                        background: "rgba(0, 0, 0, 0.9)",
+                        border:"solid 2px white",
+                        borderRadius: "10px",
                         padding: '0.6em',
                       }}
                       codeTagProps={{
