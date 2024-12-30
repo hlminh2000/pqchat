@@ -27,7 +27,7 @@ export default function CTA() {
                 }
               }}
             >
-              Launch EphemeralChat
+              Launch EphemChat
             </Button>
           </a>
         </Box>
