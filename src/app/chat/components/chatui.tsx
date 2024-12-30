@@ -114,7 +114,7 @@ const ChatUI = (props: {
     <ChatContainer>
       <MessagesContainer>
         {messages.map((message) => (
-          <MessageBubble key={message.id} isUser={message.isUser}>
+          <MessageBubble key={message.id} isUser={message.isUser} theme={theme}>
             <Avatar
               src={message.avatar}
               alt={message.isUser ? "User" : "Contact"}
@@ -123,7 +123,7 @@ const ChatUI = (props: {
                 height: 40,
               }}
             />
-            <MessageContent isUser={message.isUser}>
+            <MessageContent isUser={message.isUser} theme={theme}>
               <Markdown
                 components={{
                   code(props) {
