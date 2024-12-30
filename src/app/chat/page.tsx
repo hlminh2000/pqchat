@@ -4,9 +4,8 @@ import { ReactNode, useEffect, useState } from "react";
 import { AppBar, Box, Button, Stack, styled, Toolbar } from "@mui/material";
 import ChatUI, { ChatMessage } from "@/app/chat/components/chatui";
 import dayjs from "dayjs";
-import { Auth0Provider, IdToken, useAuth0 } from '@auth0/auth0-react';
+import { IdToken, useAuth0 } from '@auth0/auth0-react';
 import { InfoButton } from "@/app/chat/components/InfoButton";
-import { AsymetricCryptoUtilsImpl } from "@/common/utils/AsymetricCryptoUtil";
 import { EncryptedData, SymmetricCryptoUtils } from "@/common/utils/SymmetricCryptoUtil";
 import { ToastContainer, toast } from 'react-toastify';
 import { verifyIdToken } from '@/common/utils/verifyIdToken';
@@ -16,6 +15,7 @@ import { AddCircleOutline } from '@mui/icons-material';
 import { AuthProvider } from '@/common/components/AuthProvider';
 import { getPeerId } from '@/common/utils/getPeerId';
 import { ThemeProvider } from '@/common/components/ThemeProvider';
+import { MlKem1024 } from "mlkem";
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: "#ffffff",
@@ -37,11 +37,11 @@ const useSortedMessages = () => {
   return { messages, addMessage };
 }
 
-const asymCryptoUtil = new AsymetricCryptoUtilsImpl();
 const symCryptoUtil = new SymmetricCryptoUtils();
 
 const ChatApp = () => {
   const peerId = getPeerId();
+  const isHost = !peerId
 
   const { user, isLoading: isLoadingUser, getIdTokenClaims, logout } = useAuth0();
 
@@ -50,53 +50,85 @@ const ChatApp = () => {
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
   const { messages, addMessage } = useSortedMessages();
 
-  const [peerPk, setPeerPk] = useState<CryptoKey | null>(null);
-  const [sharedSecret, setSharedSecret] = useState<CryptoKey | null>(null)
-  const [asymKeyPair, setAsymKeyPair] = useState<Awaited<ReturnType<typeof asymCryptoUtil.generateRSAKeyPair>> | null>(null)
+  /**** PQC key exchange state transformations ****/
+  const [mlKem] = useState(new MlKem1024());
+  const [kemKeypair] = useState<Promise<[Uint8Array<ArrayBufferLike>, Uint8Array<ArrayBufferLike>]>>(mlKem.generateKeyPair())
+  const [ss, setSS] = useState<CryptoKey | null>(null)
+  const [kemCt, setKemCt] = useState<Uint8Array<ArrayBufferLike> | null>(null)
+  const [peerPqcPk, setPeerPqcPk] = useState<Uint8Array<ArrayBufferLike> | null>(null)
 
-
-  type SerializedRtcMessage = { type: "pk", data: JsonWebKey }
-    | { type: "sharedSecret", data: string }  // encrypted cipher
-    | { type: "chat", data: EncryptedData }
-  type RtcMessage = { type: "pk", data: JsonWebKey }
-    | { type: "sharedSecret", data: JsonWebKey }
-    | { type: "chat", data: ChatMessage }
-  const sendRtcMessage = async (data: RtcMessage) => {
-    if (!dataChannel) return
-    if (data.type === "pk") {
-      dataChannel.send(JSON.stringify(data))
-    } else if (data.type === "chat" && sharedSecret) {
-      const encryptedChatMessage = await symCryptoUtil.encrypt(JSON.stringify(data.data), sharedSecret)
-      dataChannel.send(JSON.stringify({ ...data, data: encryptedChatMessage }))
-    } else if (data.type === "sharedSecret" && peerPk) {
-      const encryptedSymKey = await asymCryptoUtil.encrypt(JSON.stringify(data.data), peerPk)
-      dataChannel.send(JSON.stringify({ ...data, data: encryptedSymKey }))
+  const uintArrayToB64 = (key: Uint8Array<ArrayBufferLike>) => btoa(String.fromCharCode.apply(null, [...key]))
+  const b64ToUintArray = (b64encoded: string) => new Uint8Array(atob(b64encoded).split("").map(c => c.charCodeAt(0)))
+  const rawKeyToCryptoKey = (rawKey: Uint8Array<ArrayBufferLike>): Promise<CryptoKey> => {
+    try {
+      return crypto.subtle.importKey(
+        "raw",
+        rawKey.buffer.slice(0, 32) as ArrayBuffer, // AES can only take 
+        {
+          name: "AES-GCM",
+          length: 256
+        },
+        false,
+        ["encrypt", "decrypt"]
+      )
+    } catch (err) {
+      console.error(err)
+      throw err
     }
   }
 
-  /** When the peerkPk is available, optionally generate and send shared secret **/
   useEffect(() => {
     (async () => {
-      if (!peerId && !!peerPk) {  // Elect the host to establish shared symetric key
-        const symKey = await symCryptoUtil.generateKey()
-        setSharedSecret(symKey.key)
-        sendRtcMessage({
-          type: "sharedSecret",
-          data: symKey.exportedKey
-        })
+      if (!peerPqcPk) return 
+      if (isHost) {
+        const [ct, ss] = await mlKem.encap(peerPqcPk);
+        console.log("ss: ", ss)
+        setKemCt(ct)
+        setSS(await rawKeyToCryptoKey(ss))
+        await sendRtcMessage({ type: "sharedSecret", data: { kemCt: uintArrayToB64(ct) } })
       }
     })()
-  }, [peerPk, dataChannel])
-  /********************************************************************************/
+  }, [peerPqcPk, setKemCt, setSS])
+  
+  useEffect(() => {
+    (async () => {
+      if (!peerPqcPk || !kemCt) return 
+      if (!isHost) {
+        const [pk, sk] = await kemKeypair
+        const ss = await mlKem.decap(kemCt, sk);
+        console.log("ss: ", ss)
+        setSS(await rawKeyToCryptoKey(ss))
+      }
+    })()
+  }, [peerPqcPk, kemCt, setSS])
+  /**********************************************/
+
+
+  type SerializedRtcMessage = { type: "pk", data: { pk: string } }
+    | { type: "sharedSecret", data: { kemCt: string } }  // encrypted cipher
+    | { type: "chat", data: EncryptedData }
+  type RtcMessage = { type: "pk", data: { pk: string } }
+    | { type: "sharedSecret", data: { kemCt: string } }
+    | { type: "chat", data: ChatMessage }
+  const sendRtcMessage = async (data: RtcMessage) => {
+    console.log("sending RTC message: ", data)
+    if (!dataChannel) return
+    if (data.type === "pk") {
+      dataChannel.send(JSON.stringify(data))
+    } else if (data.type === "chat" && ss) {
+      const encryptedChatMessage = await symCryptoUtil.encrypt(JSON.stringify(data.data), ss)
+      dataChannel.send(JSON.stringify({ ...data, data: encryptedChatMessage }))
+    } else if (data.type === "sharedSecret") {
+      dataChannel.send(JSON.stringify(data))
+    }
+  }
 
   const handleChannelOpen = async () => {
     console.log("channel open!")
-
-    const keyPair = await asymCryptoUtil.generateRSAKeyPair()
-    setAsymKeyPair(keyPair)
-    await sendRtcMessage({ type: "pk", data: keyPair.publicKeyJwk })
+    const [pk, sk] = await kemKeypair
+    const pkString: string = pk ? uintArrayToB64(pk) : ""
+    await sendRtcMessage({ type: "pk", data: { pk: pkString } })
     setIsDataChannelOpen(true);
-    toast("The session has started")
   }
 
   useEffect(() => {
@@ -115,23 +147,22 @@ const ChatApp = () => {
     dataChannel.onmessage = async event => {
       console.log("rtc message: ", event.data)
       const rtcMessage: SerializedRtcMessage = JSON.parse(event.data);
-      const privateKey = asymKeyPair?.privateKey
       if (rtcMessage.type === "pk") {
-        const cryptoKey = await asymCryptoUtil.importRSAKey(rtcMessage.data)
-        setPeerPk(cryptoKey)
-      } else if (rtcMessage.type === "chat" && sharedSecret) {
-        const decryptedChatMessage = JSON.parse(await symCryptoUtil.decrypt(rtcMessage.data, sharedSecret)) as ChatMessage
+        const { pk } = rtcMessage.data
+        setPeerPqcPk(b64ToUintArray(pk))
+      } else if (rtcMessage.type === "chat" && ss) {
+        const decryptedChatMessage = JSON.parse(await symCryptoUtil.decrypt(rtcMessage.data, ss)) as ChatMessage
+        console.log("decryptedChatMessage: ", decryptedChatMessage)
         addMessage({ ...decryptedChatMessage, isUser: false });
-      } else if (rtcMessage.type === "sharedSecret" && privateKey) {
-        const decryptedSharedSecret = JSON.parse(await asymCryptoUtil.decrypt(rtcMessage.data, privateKey)) as JsonWebKey
-        const symetricKey = await symCryptoUtil.importKey(decryptedSharedSecret)
-        setSharedSecret(symetricKey)
+      } else if (rtcMessage.type === "sharedSecret") {
+        const { kemCt } = rtcMessage.data
+        setKemCt(b64ToUintArray(kemCt))
       }
     };
     dataChannel.onopen = () => {
       handleChannelOpen()
     }
-  }, [dataChannel, addMessage, setPeerPk, setSharedSecret, setIsDataChannelOpen, handleChannelOpen]);
+  }, [dataChannel, addMessage, setPeerPqcPk, setKemCt, setIsDataChannelOpen, handleChannelOpen]);
 
   const [selfId] = useState(crypto.randomUUID())
   const [rtc] = useState(new RTCPeerConnection({
@@ -295,14 +326,7 @@ const ChatApp = () => {
 
   const sessionUrl = `${window.location.origin}/chat?peerId=${selfId}`;
 
-  console.log("====================")
-  console.log("isDataChannelOpen: ", isDataChannelOpen)
-  console.log("peerPk: ", peerPk)
-  console.log("asymKeyPair: ", asymKeyPair)
-  console.log("sharedSecret: ", sharedSecret)
-  console.log("isDataChannelOpen && !!peerPk && !!asymKeyPair && !!sharedSecret: ", isDataChannelOpen && !!peerPk && !!asymKeyPair && !!sharedSecret)
-  console.log("====================")
-  const isChatReady = isDataChannelOpen && !!peerPk && !!asymKeyPair && !!sharedSecret
+  const isChatReady = isDataChannelOpen && !!ss
   return (
     <main>
       <Box p={0} display={"flex"} flexDirection={"column"} height={"100vh"}>
@@ -357,7 +381,7 @@ const Login = ({ children }: { children: ReactNode }) => {
   }, [user, isLoading]);
 
   if (isLoading) return <LoadingOverlay open message='Logging in' />
-  return (!isLoading && !!user && children)
+  return (!isLoading && !!user && children);
 }
 
 function Page() {

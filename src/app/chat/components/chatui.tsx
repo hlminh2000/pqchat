@@ -7,7 +7,6 @@ import {
   Typography,
   Avatar,
   Stack,
-  Theme,
   useTheme,
 } from "@mui/material";
 import { styled } from "@mui/system";
@@ -15,7 +14,7 @@ import { IoSend } from "react-icons/io5";
 import Markdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 
-const ChatContainer = styled(Paper)(({ theme }) => ({
+const ChatContainer = styled(Paper)(() => ({
   flex: 1,
   display: "flex",
   flexDirection: "column",
@@ -39,7 +38,7 @@ const MessagesContainer = styled(Box)({
   },
 });
 
-type MessageBubbleStyleProp = { isUser: boolean, theme: Theme }
+type MessageBubbleStyleProp = { isUser: boolean }
 const MessageBubble = styled
 (({ isUser, ...rest }: MessageBubbleStyleProp & React.ComponentProps<typeof Box>) => <Box {...rest} />) // avoids passing `isUser` to the DOM
 (({ isUser }: MessageBubbleStyleProp) => ({
@@ -51,19 +50,20 @@ const MessageBubble = styled
 
 const MessageContent = styled
 (({ isUser, ...rest }: MessageBubbleStyleProp & React.ComponentProps<typeof Paper>) => <Paper {...rest} />) // avoids passing `isUser` to the DOM
-(({ isUser, theme }: MessageBubbleStyleProp) => ({
+(({ isUser }: MessageBubbleStyleProp) => {
+  return ({
   padding: "12px 16px",
   borderRadius: "16px",
   maxWidth: "70%",
   marginLeft: isUser ? 0 : "12px",
   marginRight: isUser ? "12px" : 0,
-  backgroundColor: isUser ? theme.palette.primary.main : "#f5f5f5",
+  backgroundColor: isUser ? "#000" : "#f5f5f5",
   color: isUser ? "#fff" : "#000",
   transition: "all 0.2s ease-in-out",
   "&:hover": {
     transform: "scale(1.02)",
   },
-}));
+})});
 
 const InputContainer = styled(Box)({
   padding: "20px",
@@ -114,7 +114,7 @@ const ChatUI = (props: {
     <ChatContainer>
       <MessagesContainer>
         {messages.map((message) => (
-          <MessageBubble key={message.id} isUser={message.isUser} theme={theme}>
+          <MessageBubble key={message.id} isUser={message.isUser}>
             <Avatar
               src={message.avatar}
               alt={message.isUser ? "User" : "Contact"}
@@ -123,7 +123,7 @@ const ChatUI = (props: {
                 height: 40,
               }}
             />
-            <MessageContent isUser={message.isUser} theme={theme}>
+            <MessageContent isUser={message.isUser}>
               <Markdown
                 components={{
                   code(props) {

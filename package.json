@@ -21,6 +21,7 @@
     "idtoken-verifier": "^2.2.4",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
+    "mlkem": "^2.3.0",
     "mqtt": "^5.10.3",
     "next": "15.1.2",
     "react": "^19.0.0",
