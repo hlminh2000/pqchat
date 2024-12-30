@@ -16,7 +16,7 @@ import { AuthProvider } from '@/common/components/AuthProvider';
 import { getPeerId } from '@/common/utils/getPeerId';
 import { ThemeProvider } from '@/common/components/ThemeProvider';
 import { MlKem1024 } from "mlkem";
-import { b64ToUintArray, rawKeyToCryptoKey, uintArrayToB64 } from '@/common/utils/pqcCryptoUtils';
+import { b64ToUintArray, sharedSecretToCryptoKey, uintArrayToB64 } from '@/common/utils/pqcCryptoUtils';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: "#ffffff",
@@ -51,12 +51,14 @@ const ChatApp = () => {
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
   const { messages, addMessage } = useSortedMessages();
 
-  /**** PQC key exchange state transformations ****/
+  /********************************************/
+  /**** Key exchange state transformations ****/
+  /********************************************/
   const [mlKem] = useState(new MlKem1024());
   const [kemKeypair] = useState<Promise<[Uint8Array<ArrayBufferLike>, Uint8Array<ArrayBufferLike>]>>(mlKem.generateKeyPair())
-  const [ss, setSS] = useState<CryptoKey | null>(null)
   const [kemCt, setKemCt] = useState<Uint8Array<ArrayBufferLike> | null>(null)
   const [peerPk, setPeerPk] = useState<Uint8Array<ArrayBufferLike> | null>(null)
+  const [aesKey, setAesKey] = useState<CryptoKey | null>(null)
 
   useEffect(() => {
     (async () => {
@@ -65,11 +67,11 @@ const ChatApp = () => {
         const [ct, ss] = await mlKem.encap(peerPk);
         console.log("ss: ", ss)
         setKemCt(ct)
-        setSS(await rawKeyToCryptoKey(ss))
+        setAesKey(await sharedSecretToCryptoKey(ss))
         await sendRtcMessage({ type: "sharedSecret", data: { kemCt: uintArrayToB64(ct) } })
       }
     })()
-  }, [peerPk, setKemCt, setSS])
+  }, [peerPk, setKemCt, setAesKey])
 
   useEffect(() => {
     (async () => {
@@ -78,10 +80,11 @@ const ChatApp = () => {
         const [pk, sk] = await kemKeypair
         const ss = await mlKem.decap(kemCt, sk);
         console.log("ss: ", ss)
-        setSS(await rawKeyToCryptoKey(ss))
+        setAesKey(await sharedSecretToCryptoKey(ss))
       }
     })()
-  }, [peerPk, kemCt, setSS])
+  }, [peerPk, kemCt, setAesKey])
+  /**********************************************/
   /**********************************************/
 
   type SerializedRtcMessage = { type: "pk", data: { pk: string } }
@@ -95,8 +98,8 @@ const ChatApp = () => {
     if (!dataChannel) return
     if (data.type === "pk") {
       dataChannel.send(JSON.stringify(data))
-    } else if (data.type === "chat" && ss) {
-      const encryptedChatMessage = await symCryptoUtil.encrypt(JSON.stringify(data.data), ss)
+    } else if (data.type === "chat" && aesKey) {
+      const encryptedChatMessage = await symCryptoUtil.encrypt(JSON.stringify(data.data), aesKey)
       dataChannel.send(JSON.stringify({ ...data, data: encryptedChatMessage }))
     } else if (data.type === "sharedSecret") {
       dataChannel.send(JSON.stringify(data))
@@ -119,8 +122,8 @@ const ChatApp = () => {
     if (rtcMessage.type === "pk") {
       const { pk } = rtcMessage.data
       setPeerPk(b64ToUintArray(pk))
-    } else if (rtcMessage.type === "chat" && ss) {
-      const decryptedChatMessage = JSON.parse(await symCryptoUtil.decrypt(rtcMessage.data, ss)) as ChatMessage
+    } else if (rtcMessage.type === "chat" && aesKey) {
+      const decryptedChatMessage = JSON.parse(await symCryptoUtil.decrypt(rtcMessage.data, aesKey)) as ChatMessage
       console.log("decryptedChatMessage: ", decryptedChatMessage)
       addMessage({ ...decryptedChatMessage, isUser: false });
     } else if (rtcMessage.type === "sharedSecret") {
@@ -316,7 +319,7 @@ const ChatApp = () => {
 
   const sessionUrl = `${window.location.origin}/chat?peerId=${selfId}`;
 
-  const isChatReady = isDataChannelOpen && !!ss
+  const isChatReady = isDataChannelOpen && !!aesKey
   return (
     <main>
       <Box p={0} display={"flex"} flexDirection={"column"} height={"100vh"}>
