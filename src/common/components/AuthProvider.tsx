@@ -8,18 +8,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     <Auth0Provider
       domain={process.env.NEXT_PUBLIC_AUTH0_DOMAIN as string}
       clientId={process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID as string}
-      onRedirectCallback={(appState) => {
-        if (!appState) return
-
-        // pass appstate back to app through search string
-        const urlParams = new URLSearchParams();
-        Object.entries(appState).forEach(([key, value]) => {
-          urlParams.set(key, value)
-        })
-        if (urlParams.size) {
-          window.location.search = urlParams.toString();
-        }
-      }}
       authorizationParams={{
         redirect_uri: `${window.location.origin}/chat`
       }}

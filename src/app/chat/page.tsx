@@ -341,14 +341,16 @@ const ChatApp = () => {
 
 const Login = ({ children }: { children: ReactNode }) => {
   const { loginWithRedirect, user, isLoading } = useAuth0();
-  
+  const peerId = getPeerId()
   useEffect(() => {
     !isLoading && !user && loginWithRedirect({
       authorizationParams: {
         redirect_uri: `${window.location.origin}/chat`
       },
       appState: {
-        peerId: getPeerId(),
+        returnTo: peerId
+          ? `${window.location.origin}/chat?peerId=${peerId}`
+          : `${window.location.origin}/chat`
       },
     })
   }, [user, isLoading]);
