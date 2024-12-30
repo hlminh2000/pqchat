@@ -84,8 +84,6 @@ const ChatApp = () => {
   }, [peerPqcPk, kemCt, setSS])
   /**********************************************/
 
-
-
   type SerializedRtcMessage = { type: "pk", data: { pk: string } }
     | { type: "sharedSecret", data: { kemCt: string } }  // encrypted cipher
     | { type: "chat", data: EncryptedData }
@@ -105,37 +103,34 @@ const ChatApp = () => {
     }
   }
 
-  const handleChannelOpen = async () => {
+  const handleChannelOpen = (dataChannel: RTCDataChannel) => async () => {
     console.log("channel open!")
     const [pk, sk] = await kemKeypair
     const pkString: string = pk ? uintArrayToB64(pk) : ""
     await sendRtcMessage({ type: "pk", data: { pk: pkString } })
-    setupDatachannelMessageHandler()
+    dataChannel.onmessage = handleDataChannelMessage
     setIsDataChannelOpen(true);
   }
 
-  const setupDatachannelMessageHandler = () => {
-    if (!dataChannel) return
-    dataChannel.onmessage = async event => {
-      console.log("rtc message: ", event.data)
-      const rtcMessage: SerializedRtcMessage = JSON.parse(event.data);
-      if (rtcMessage.type === "pk") {
-        const { pk } = rtcMessage.data
-        setPeerPqcPk(b64ToUintArray(pk))
-      } else if (rtcMessage.type === "chat" && ss) {
-        const decryptedChatMessage = JSON.parse(await symCryptoUtil.decrypt(rtcMessage.data, ss)) as ChatMessage
-        console.log("decryptedChatMessage: ", decryptedChatMessage)
-        addMessage({ ...decryptedChatMessage, isUser: false });
-      } else if (rtcMessage.type === "sharedSecret") {
-        const { kemCt } = rtcMessage.data
-        setKemCt(b64ToUintArray(kemCt))
-      }
-    };
+  const handleDataChannelMessage = async (event: MessageEvent) => {
+    console.log("rtc message: ", event.data)
+    const rtcMessage: SerializedRtcMessage = JSON.parse(event.data);
+    if (rtcMessage.type === "pk") {
+      const { pk } = rtcMessage.data
+      setPeerPqcPk(b64ToUintArray(pk))
+    } else if (rtcMessage.type === "chat" && ss) {
+      const decryptedChatMessage = JSON.parse(await symCryptoUtil.decrypt(rtcMessage.data, ss)) as ChatMessage
+      console.log("decryptedChatMessage: ", decryptedChatMessage)
+      addMessage({ ...decryptedChatMessage, isUser: false });
+    } else if (rtcMessage.type === "sharedSecret") {
+      const { kemCt } = rtcMessage.data
+      setKemCt(b64ToUintArray(kemCt))
+    }
   }
 
   useEffect(() => {
     if (dataChannel?.readyState === "open") {
-      handleChannelOpen()
+      handleChannelOpen(dataChannel)()
     }
   }, [dataChannel])
 
@@ -146,10 +141,8 @@ const ChatApp = () => {
       setIsDataChannelOpen(false);
       toast(`${otherUser?.email || otherUser?.nickname} has left`)
     }
-    setupDatachannelMessageHandler()
-    dataChannel.onopen = () => {
-      handleChannelOpen()
-    }
+    dataChannel.onmessage = handleDataChannelMessage
+    dataChannel.onopen = handleChannelOpen(dataChannel)
   }, [dataChannel, addMessage, setPeerPqcPk, setKemCt, setIsDataChannelOpen, handleChannelOpen]);
 
   const [selfId] = useState(crypto.randomUUID())
