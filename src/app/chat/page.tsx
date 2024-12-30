@@ -6,14 +6,15 @@ import ChatUI, { ChatMessage } from "@/app/chat/components/chatui";
 import dayjs from "dayjs";
 import { Auth0Provider, IdToken, useAuth0 } from '@auth0/auth0-react';
 import { InfoButton } from "@/app/chat/components/InfoButton";
-import { AsymetricCryptoUtilsImpl } from "@/utils/AsymetricCryptoUtil";
-import { EncryptedData, SymmetricCryptoUtils } from "@/utils/SymmetricCryptoUtil";
+import { AsymetricCryptoUtilsImpl } from "@/common/utils/AsymetricCryptoUtil";
+import { EncryptedData, SymmetricCryptoUtils } from "@/common/utils/SymmetricCryptoUtil";
 import { ToastContainer, toast } from 'react-toastify';
-import { verifyIdToken } from '@/utils/verifyIdToken';
+import { verifyIdToken } from '@/common/utils/verifyIdToken';
 import * as Ably from 'ably';
 import { LoadingOverlay } from '@/app/chat/components/LoadingOverlay';
 import { AddCircleOutline } from '@mui/icons-material';
 import { AuthProvider } from '@/common/components/AuthProvider';
+import { getPeerId } from '@/common/utils/getPeerId';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: "#ffffff",
@@ -37,11 +38,6 @@ const useSortedMessages = () => {
 
 const asymCryptoUtil = new AsymetricCryptoUtilsImpl();
 const symCryptoUtil = new SymmetricCryptoUtils();
-
-const getPeerId = () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get("peerId");
-}
 
 const ChatApp = () => {
   const peerId = getPeerId();
@@ -345,19 +341,15 @@ const ChatApp = () => {
 
 const Login = ({ children }: { children: ReactNode }) => {
   const { loginWithRedirect, user, isLoading } = useAuth0();
-  const peerId = getPeerId();
-
-  console.log("window.location.origin: ", window.location.origin)
-
-  console.log("isLoading: ", isLoading)
-  console.log("user: ", user)
+  
   useEffect(() => {
-    if (!isLoading && !user) loginWithRedirect({
+    !isLoading && !user && loginWithRedirect({
       authorizationParams: {
-        redirect_uri: peerId
-          ? `${window.location.origin}/chat?peerId=${peerId}`
-          : `${window.location.origin}/chat`
-      }
+        redirect_uri: `${window.location.origin}/chat`
+      },
+      appState: {
+        peerId: getPeerId(),
+      },
     })
   }, [user, isLoading]);
 
