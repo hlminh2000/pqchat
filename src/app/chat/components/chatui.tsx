@@ -7,6 +7,8 @@ import {
   Typography,
   Avatar,
   Stack,
+  Theme,
+  useTheme,
 } from "@mui/material";
 import { styled } from "@mui/system";
 import { IoSend } from "react-icons/io5";
@@ -37,7 +39,7 @@ const MessagesContainer = styled(Box)({
   },
 });
 
-type MessageBubbleStyleProp = { isUser: boolean }
+type MessageBubbleStyleProp = { isUser: boolean, theme: Theme }
 const MessageBubble = styled
 (({ isUser, ...rest }: MessageBubbleStyleProp & React.ComponentProps<typeof Box>) => <Box {...rest} />) // avoids passing `isUser` to the DOM
 (({ isUser }: MessageBubbleStyleProp) => ({
@@ -49,13 +51,13 @@ const MessageBubble = styled
 
 const MessageContent = styled
 (({ isUser, ...rest }: MessageBubbleStyleProp & React.ComponentProps<typeof Paper>) => <Paper {...rest} />) // avoids passing `isUser` to the DOM
-(({ isUser }: MessageBubbleStyleProp) => ({
+(({ isUser, theme }: MessageBubbleStyleProp) => ({
   padding: "12px 16px",
   borderRadius: "16px",
   maxWidth: "70%",
   marginLeft: isUser ? 0 : "12px",
   marginRight: isUser ? "12px" : 0,
-  backgroundColor: isUser ? "#2196f3" : "#f5f5f5",
+  backgroundColor: isUser ? theme.palette.primary.main : "#f5f5f5",
   color: isUser ? "#fff" : "#000",
   transition: "all 0.2s ease-in-out",
   "&:hover": {
@@ -84,6 +86,7 @@ const ChatUI = (props: {
   const { messages = [], sendMessage, enabled } = props;
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const theme = useTheme();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -186,11 +189,8 @@ const ChatUI = (props: {
             aria-label="Send message"
             sx={{
               height: "40px",
-              backgroundColor: "#2196f3",
+              backgroundColor: theme.palette.primary.main,
               color: "#fff",
-              "&:hover": {
-                backgroundColor: "#1976d2",
-              },
             }}
           >
             <IoSend />

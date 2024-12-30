@@ -14,11 +14,11 @@ export default function Footer() {
               <GitHubIcon/>
             </Link>
           </Box>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.primary">
             {/* © 2023 EphemeralChat. All rights reserved. */}
             made with ❤️ from Ottawa, Canada
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.primary">
             {/* © 2023 EphemeralChat. All rights reserved. */}
             
           </Typography>

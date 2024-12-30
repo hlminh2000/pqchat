@@ -15,6 +15,7 @@ import { LoadingOverlay } from '@/app/chat/components/LoadingOverlay';
 import { AddCircleOutline } from '@mui/icons-material';
 import { AuthProvider } from '@/common/components/AuthProvider';
 import { getPeerId } from '@/common/utils/getPeerId';
+import { ThemeProvider } from '@/common/components/ThemeProvider';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: "#ffffff",
@@ -95,7 +96,7 @@ const ChatApp = () => {
     setAsymKeyPair(keyPair)
     await sendRtcMessage({ type: "pk", data: keyPair.publicKeyJwk })
     setIsDataChannelOpen(true);
-    toast.info("The session has started")
+    toast("The session has started")
   }
 
   useEffect(() => {
@@ -109,7 +110,7 @@ const ChatApp = () => {
 
     dataChannel.onclose = event => {
       setIsDataChannelOpen(false);
-      toast.info(`${otherUser?.email || otherUser?.nickname} has left`)
+      toast(`${otherUser?.email || otherUser?.nickname} has left`)
     }
     dataChannel.onmessage = async event => {
       console.log("rtc message: ", event.data)
@@ -200,7 +201,7 @@ const ChatApp = () => {
               <Stack flex={1}>
                 <Box>{email || nickname || ""} would like to connect</Box>
                 <Box mt={1} display={"flex"} justifyContent={"flex-end"}>
-                  <Button size='small' variant='contained' color='success' onClick={async () => {
+                  <Button size='small' variant='contained' color='primary' onClick={async () => {
                     pendingOffers[from].offer = offer
                     await attemptCompleteConnection(from);
                     const answer = await rtc.createAnswer();
@@ -211,7 +212,7 @@ const ChatApp = () => {
                     closeToast();
                   }}>Accept</Button>
                   <Box mr={1}></Box>
-                  <Button size='small' variant='contained' color='error' onClick={async () => {
+                  <Button size='small' variant='outlined' color='primary' onClick={async () => {
                     targetAblyChannel.publish("rtc:deny", { from })
                     closeToast();
                   }}>Deny</Button>
@@ -314,14 +315,14 @@ const ChatApp = () => {
                 </Box>
               )}
               <a href='/chat' target='_blank'>
-                <Button variant='outlined' startIcon={<AddCircleOutline />}>
+                <Button variant='contained' startIcon={<AddCircleOutline />}>
                   New Chat
                 </Button>
               </a>
             </Box>
             <Box flex={1}></Box>
             {!isLoadingUser && !!user && (
-              <Button variant="outlined" color='error' onClick={async () => {
+              <Button variant="outlined" color='primary' onClick={async () => {
                 await logout({ logoutParams: { returnTo: window.location.origin } })
               }}>Logout</Button>
             )}
@@ -361,12 +362,14 @@ const Login = ({ children }: { children: ReactNode }) => {
 
 function Page() {
   return (
-    <AuthProvider>
-      <ToastContainer />
-      <Login>
-        <ChatApp />
-      </Login>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ToastContainer />
+        <Login>
+          <ChatApp />
+        </Login>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
