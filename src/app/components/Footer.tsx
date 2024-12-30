@@ -16,7 +16,7 @@ export default function Footer() {
           </Box>
           <Typography variant="body2" color="text.primary">
             {/* © 2023 EphemeralChat. All rights reserved. */}
-            made with ❤️ from Ottawa, Canada
+            made with ❤️ in Canada
           </Typography>
           <Typography variant="body2" color="text.primary">
             {/* © 2023 EphemeralChat. All rights reserved. */}
