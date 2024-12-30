@@ -56,24 +56,24 @@ const ChatApp = () => {
   const [kemKeypair] = useState<Promise<[Uint8Array<ArrayBufferLike>, Uint8Array<ArrayBufferLike>]>>(mlKem.generateKeyPair())
   const [ss, setSS] = useState<CryptoKey | null>(null)
   const [kemCt, setKemCt] = useState<Uint8Array<ArrayBufferLike> | null>(null)
-  const [peerPqcPk, setPeerPqcPk] = useState<Uint8Array<ArrayBufferLike> | null>(null)
+  const [peerPk, setPeerPk] = useState<Uint8Array<ArrayBufferLike> | null>(null)
 
   useEffect(() => {
     (async () => {
-      if (!peerPqcPk) return
+      if (!peerPk) return
       if (isHost) {
-        const [ct, ss] = await mlKem.encap(peerPqcPk);
+        const [ct, ss] = await mlKem.encap(peerPk);
         console.log("ss: ", ss)
         setKemCt(ct)
         setSS(await rawKeyToCryptoKey(ss))
         await sendRtcMessage({ type: "sharedSecret", data: { kemCt: uintArrayToB64(ct) } })
       }
     })()
-  }, [peerPqcPk, setKemCt, setSS])
+  }, [peerPk, setKemCt, setSS])
 
   useEffect(() => {
     (async () => {
-      if (!peerPqcPk || !kemCt) return
+      if (!peerPk || !kemCt) return
       if (!isHost) {
         const [pk, sk] = await kemKeypair
         const ss = await mlKem.decap(kemCt, sk);
@@ -81,7 +81,7 @@ const ChatApp = () => {
         setSS(await rawKeyToCryptoKey(ss))
       }
     })()
-  }, [peerPqcPk, kemCt, setSS])
+  }, [peerPk, kemCt, setSS])
   /**********************************************/
 
   type SerializedRtcMessage = { type: "pk", data: { pk: string } }
@@ -118,7 +118,7 @@ const ChatApp = () => {
     const rtcMessage: SerializedRtcMessage = JSON.parse(event.data);
     if (rtcMessage.type === "pk") {
       const { pk } = rtcMessage.data
-      setPeerPqcPk(b64ToUintArray(pk))
+      setPeerPk(b64ToUintArray(pk))
     } else if (rtcMessage.type === "chat" && ss) {
       const decryptedChatMessage = JSON.parse(await symCryptoUtil.decrypt(rtcMessage.data, ss)) as ChatMessage
       console.log("decryptedChatMessage: ", decryptedChatMessage)
@@ -144,7 +144,7 @@ const ChatApp = () => {
     }
     dataChannel.onmessage = handleDataChannelMessage
     dataChannel.onopen = handleChannelOpen(dataChannel)
-  }, [dataChannel, addMessage, setPeerPqcPk, setKemCt, setIsDataChannelOpen, handleChannelOpen]);
+  }, [dataChannel, addMessage, setPeerPk, setKemCt, setIsDataChannelOpen, handleChannelOpen]);
 
   const [selfId] = useState(crypto.randomUUID())
   const [rtc] = useState(new RTCPeerConnection({
@@ -382,7 +382,7 @@ function Page() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <ToastContainer />
+        <ToastContainer theme='dark' />
         <Login>
           <ChatApp />
         </Login>
