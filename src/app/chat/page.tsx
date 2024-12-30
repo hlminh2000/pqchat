@@ -71,7 +71,7 @@ const ChatApp = () => {
         await sendRtcMessage({ type: "sharedSecret", data: { kemCt: uintArrayToB64(ct) } })
       }
     })()
-  }, [peerPk, setKemCt, setAesKey])
+  }, [peerPk])
 
   useEffect(() => {
     (async () => {
@@ -83,7 +83,7 @@ const ChatApp = () => {
         setAesKey(await sharedSecretToCryptoKey(ss))
       }
     })()
-  }, [peerPk, kemCt, setAesKey])
+  }, [peerPk, kemCt])
   /**********************************************/
   /**********************************************/
 
@@ -121,14 +121,14 @@ const ChatApp = () => {
     const rtcMessage: SerializedRtcMessage = JSON.parse(event.data);
     if (rtcMessage.type === "pk") {
       const { pk } = rtcMessage.data
-      setPeerPk(b64ToUintArray(pk))
+      setPeerPk(() => b64ToUintArray(pk))
     } else if (rtcMessage.type === "chat" && aesKey) {
       const decryptedChatMessage = JSON.parse(await symCryptoUtil.decrypt(rtcMessage.data, aesKey)) as ChatMessage
       console.log("decryptedChatMessage: ", decryptedChatMessage)
       addMessage({ ...decryptedChatMessage, isUser: false });
     } else if (rtcMessage.type === "sharedSecret") {
       const { kemCt } = rtcMessage.data
-      setKemCt(b64ToUintArray(kemCt))
+      setKemCt(() => b64ToUintArray(kemCt))
     }
   }
 
@@ -147,7 +147,7 @@ const ChatApp = () => {
     }
     dataChannel.onmessage = handleDataChannelMessage
     dataChannel.onopen = handleChannelOpen(dataChannel)
-  }, [dataChannel, addMessage, setPeerPk, setKemCt, setIsDataChannelOpen, handleChannelOpen]);
+  }, [dataChannel, addMessage, handleChannelOpen]);
 
   const [selfId] = useState(crypto.randomUUID())
   const [rtc] = useState(new RTCPeerConnection({
