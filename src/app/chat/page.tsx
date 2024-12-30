@@ -314,9 +314,9 @@ const ChatApp = () => {
       <Box p={0} display={"flex"} flexDirection={"column"} height={"100vh"}>
         <StyledAppBar position="sticky">
           <Toolbar variant="dense">
-            <Box flex={1}>
+            <Box flex={1} display="flex" flexDirection={{ xs: "row" }} alignItems="center">
               {isSocketConnected && isHost && (
-                <Box mr={2} display={"inline"}>
+                <Box mr={{ xs: 0, sm: 2 }} display={"inline"}>
                   <InfoButton sessionUrl={sessionUrl} />
                 </Box>
               )}
@@ -326,7 +326,7 @@ const ChatApp = () => {
                 </Button>
               </a>
             </Box>
-            <Box flex={1}></Box>
+            <Box flex={1} display={{ xs: "none", sm: "block" }}></Box>
             {!isLoadingUser && !!user && (
               <Button variant="outlined" color='primary' onClick={async () => {
                 await logout({ logoutParams: { returnTo: window.location.origin } })
