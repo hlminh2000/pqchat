@@ -276,7 +276,7 @@ const ChatApp = () => {
     }
 
     const init = async () => {
-      if (!!peerId) {
+      if (!isHost) {
         const peerSignalingChannel = ablyClient.channels.get(`signaling:${peerId}`)
 
         setDataChannel(rtc.createDataChannel("chatChannel"))
@@ -333,7 +333,7 @@ const ChatApp = () => {
         <StyledAppBar position="sticky">
           <Toolbar variant="dense">
             <Box flex={1}>
-              {isSocketConnected && !peerId && (
+              {isSocketConnected && isHost && (
                 <Box mr={2} display={"inline"}>
                   <InfoButton sessionUrl={sessionUrl} />
                 </Box>
@@ -359,7 +359,7 @@ const ChatApp = () => {
         />
       </Box>
       <LoadingOverlay open={!isSocketConnected} message={"Connecting"} />
-      <LoadingOverlay open={isSocketConnected && !isChatReady && !!peerId} message={"Waiting for host to accept your request"} />
+      <LoadingOverlay open={isSocketConnected && !isChatReady && !isHost} message={"Waiting for host to accept your request"} />
     </main>
   )
 }
