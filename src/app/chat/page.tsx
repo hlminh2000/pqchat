@@ -340,8 +340,8 @@ const ChatApp = () => {
           enabled={isChatReady}
         />
       </Box>
-      <LoadingOverlay open={!isSocketConnected} message={"Connecting"} />
-      <LoadingOverlay open={isSocketConnected && !isChatReady && !isHost} message={"Waiting for host to accept your request"} />
+      <LoadingOverlay open={!isSocketConnected} message={"Connecting..."} />
+      <LoadingOverlay open={isSocketConnected && !isChatReady && !isHost} message={"Waiting for host to accept your request..."} />
     </main>
   )
 }
@@ -361,7 +361,7 @@ const Login = ({ children }: { children: ReactNode }) => {
     },
   })
 
-  if (isLoading) return <LoadingOverlay open message='Logging in' />
+  if (isLoading) return <LoadingOverlay open message='Loading...' />
   if (!isLoading && !user) return (
     <Box display={"flex"} flexDirection={"column"} justifyContent={"center"} height={"100vh"}>
       <Container>
