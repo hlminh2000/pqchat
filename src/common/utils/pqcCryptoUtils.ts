@@ -16,7 +16,7 @@ export const sharedSecretToCryptoKey = async (ss: Uint8Array<ArrayBufferLike>): 
   return crypto.subtle.deriveKey(
     {
       name: 'HKDF',
-      salt: new Uint8Array(),
+      salt: new TextEncoder().encode("symetric key"),
       info: new TextEncoder().encode("symetric key"),
       hash: 'SHA-256'
     },
