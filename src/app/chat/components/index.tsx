@@ -295,6 +295,7 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
     const init = async () => {
       const peerSignalingChannel = ablyClient.channels.get(`signaling:${peerId}`)
       rtc.onicecandidate = async event => {
+        console.log("own candidate: ", event.candidate)
         await peerSignalingChannel.publish("rtc:ice", { from: selfId, payload: event.candidate });
       }
       if (!isHost) {
