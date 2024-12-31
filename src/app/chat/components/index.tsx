@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { ReactNode, useEffect, useState } from "react";
-import { AppBar, Box, Button, Container, Stack, styled, Toolbar, Typography } from "@mui/material";
+import { AppBar, Box, Button, CircularProgress, Container, Stack, styled, Toolbar, Typography } from "@mui/material";
 import ChatUI, { ChatMessage } from "@/app/chat/components/chatui";
 import dayjs from "dayjs";
 import { IdToken, useAuth0 } from '@auth0/auth0-react';
@@ -20,6 +20,7 @@ import { MlKem1024 } from "mlkem";
 import { b64ToUintArray, sharedSecretToCryptoKey, uintArrayToB64 } from '@/common/utils/pqcCryptoUtils';
 import { Session, withPageAuthRequired } from '@auth0/nextjs-auth0';
 import { UserProvider, useUser } from '@auth0/nextjs-auth0/client';
+import { resolve } from 'path';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: "#ffffff",
@@ -192,15 +193,24 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
         iceCandidates: []
       }
 
-      const attemptCompleteConnection = async (peerId: string) => {
+      const waitForIceCandidates = async (peerId: string) => {
         // setRemoteDescription has to be called before addIceCandidate
         const pendingOffer = pendingOffers[peerId];
-        if (!!pendingOffer.iceCandidates.length && !!pendingOffer.offer) {
-          await rtc.setRemoteDescription(pendingOffer.offer)
-          for (const candidate of pendingOffer.iceCandidates) {
-            await rtc.addIceCandidate(candidate)
-          }
-          delete pendingOffers[peerId]
+        await new Promise<void>((resolve) => {
+          const check = setInterval(() => {
+            console.log("pendingOffer: ", pendingOffer)
+            if (pendingOffer.iceCandidates.at(-1) === null) {
+              resolve()
+              clearInterval(check)
+            }
+          }, 1000)
+        })
+        console.log("setting remote description")
+        await rtc.setRemoteDescription(pendingOffer.offer as RTCSessionDescriptionInit)
+        console.log("complete setting remote description")
+        for (const candidate of pendingOffer.iceCandidates) {
+          console.log("candidate: ", candidate)
+          if (candidate) await rtc.addIceCandidate(candidate)
         }
       }
 
@@ -218,36 +228,43 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
           const { nickname, email } = userData
 
           toast(
-            ({ closeToast }) => (
-              <Stack flex={1}>
-                <Box>{email || nickname || ""} would like to connect</Box>
-                <Box mt={1} display={"flex"} justifyContent={"flex-end"}>
-                  <Button
-                    size='small' variant='outlined'
-                    // @ts-ignore
-                    color='primary.contrastText'
-                    onClick={async () => {
-                      pendingOffers[from].offer = offer
-                      await attemptCompleteConnection(from);
-                      const answer = await rtc.createAnswer();
-                      const idToken = session?.idToken
-                      await rtc.setLocalDescription(answer);
-                      targetAblyChannel.publish("rtc:answer", { from, payload: { answer, idToken } })
-                      setOtherUser(userData)
-                      closeToast();
-                    }}>Accept</Button>
-                  <Box mr={1}></Box>
-                  <Button
-                    size='small' variant='text'
-                    // @ts-ignore
-                    color='primary.contrastText'
-                    onClick={async () => {
-                      targetAblyChannel.publish("rtc:deny", { from })
-                      closeToast();
-                    }}>Deny</Button>
-                </Box>
-              </Stack>
-            ),
+            ({ closeToast }) => {
+              const [loading, setLoading] = useState(false);
+              return (
+                <Stack flex={1}>
+                  <Box>{email || nickname || ""} would like to connect</Box>
+                  <Box mt={1} display={"flex"} justifyContent={"flex-end"}>
+                    <Button
+                      size='small' variant='outlined'
+                      disabled={loading}
+                      // @ts-ignore
+                      color='primary.contrastText'
+                      onClick={async () => {
+                        setLoading(true)
+                        pendingOffers[from].offer = offer
+                        await waitForIceCandidates(from);
+                        const answer = await rtc.createAnswer();
+                        const idToken = session?.idToken
+                        await rtc.setLocalDescription(answer);
+                        targetAblyChannel.publish("rtc:answer", { from, payload: { answer, idToken } })
+                        setOtherUser(userData)
+                        closeToast();
+                      }}>Accept</Button>
+                    <Box mr={1}></Box>
+                    <Button
+                      size='small' variant='text'
+                      disabled={loading}
+                      // @ts-ignore
+                      color='primary.contrastText'
+                      onClick={async () => {
+                        targetAblyChannel.publish("rtc:deny", { from })
+                        closeToast();
+                      }}>Deny</Button>
+                    {loading && <CircularProgress color="inherit" />}
+                  </Box>
+                </Stack>
+              )
+            },
             { autoClose: false, closeButton: () => null }
           )
           break;
@@ -264,7 +281,7 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
         case "rtc:ice":
           console.log(`received candidate from ${from}: `, payload)
           pendingOffers[from].iceCandidates.push(payload)
-          await attemptCompleteConnection(from)
+          // await attemptCompleteConnection(from)
           break;
 
         case "rtc:deny":
@@ -280,7 +297,8 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
         setDataChannel(rtc.createDataChannel("chatChannel"))
 
         rtc.onicecandidate = async event => {
-          event.candidate && await peerSignalingChannel.publish("rtc:ice", { from: selfId, payload: event.candidate });
+          console.log("event.candidate: ", event.candidate)
+          await peerSignalingChannel.publish("rtc:ice", { from: selfId, payload: event.candidate });
         }
 
         const offer = await rtc.createOffer();
@@ -369,7 +387,7 @@ export function ChatPage({ session, peerId }: { session: Session, peerId?: strin
       <ThemeProvider>
         <AuthProvider>
           <ToastContainer theme='dark' />
-          <ChatApp session={session} peerId={peerId}/>
+          <ChatApp session={session} peerId={peerId} />
         </AuthProvider>
       </ThemeProvider>
     </UserProvider>
