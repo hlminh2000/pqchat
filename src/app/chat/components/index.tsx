@@ -205,9 +205,7 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
             }
           }, 1000)
         })
-        console.log("setting remote description")
-        await rtc.setRemoteDescription(pendingOffer.offer as RTCSessionDescriptionInit)
-        console.log("complete setting remote description")
+        pendingOffer.offer && await rtc.setRemoteDescription(pendingOffer.offer as RTCSessionDescriptionInit)
         for (const candidate of pendingOffer.iceCandidates) {
           console.log("candidate: ", candidate)
           if (candidate) await rtc.addIceCandidate(candidate)
@@ -280,8 +278,12 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
 
         case "rtc:ice":
           console.log(`received candidate from ${from}: `, payload)
-          pendingOffers[from].iceCandidates.push(payload)
-          // await attemptCompleteConnection(from)
+          if(isHost){
+            pendingOffers[from].iceCandidates.push(payload)
+            await waitForIceCandidates(from)
+          } else {
+            payload && await rtc.addIceCandidate(payload)
+          }
           break;
 
         case "rtc:deny":
@@ -291,15 +293,13 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
     }
 
     const init = async () => {
+      const peerSignalingChannel = ablyClient.channels.get(`signaling:${peerId}`)
+      rtc.onicecandidate = async event => {
+        await peerSignalingChannel.publish("rtc:ice", { from: selfId, payload: event.candidate });
+      }
       if (!isHost) {
-        const peerSignalingChannel = ablyClient.channels.get(`signaling:${peerId}`)
 
         setDataChannel(rtc.createDataChannel("chatChannel"))
-
-        rtc.onicecandidate = async event => {
-          console.log("event.candidate: ", event.candidate)
-          await peerSignalingChannel.publish("rtc:ice", { from: selfId, payload: event.candidate });
-        }
 
         const offer = await rtc.createOffer();
         await rtc.setLocalDescription(offer);
