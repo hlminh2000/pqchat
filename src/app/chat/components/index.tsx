@@ -14,13 +14,11 @@ import * as Ably from 'ably';
 import { LoadingOverlay } from '@/app/chat/components/LoadingOverlay';
 import { AddCircleOutline } from '@mui/icons-material';
 import { AuthProvider } from '@/common/components/AuthProvider';
-import { getPeerId } from '@/common/utils/getPeerId';
 import { ThemeProvider } from '@/common/components/ThemeProvider';
 import { MlKem1024 } from "mlkem";
 import { b64ToUintArray, sharedSecretToCryptoKey, uintArrayToB64 } from '@/common/utils/pqcCryptoUtils';
-import { Session, withPageAuthRequired } from '@auth0/nextjs-auth0';
+import { Session } from '@auth0/nextjs-auth0';
 import { UserProvider, useUser } from '@auth0/nextjs-auth0/client';
-import { resolve } from 'path';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: "#ffffff",
@@ -44,7 +42,13 @@ const useSortedMessages = () => {
 
 const symCryptoUtil = new SymmetricCryptoUtils();
 
-const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => {
+const ChatApp = ({ session, peerId, iceServers }: {
+  session: Session, peerId?: string, iceServers: {
+    urls: string,
+    username?: string,
+    credential?: string,
+  }[]
+}) => {
   const isHost = !peerId
 
   // const { user,  } = useAuth0();
@@ -160,17 +164,19 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
     iceServers: [
       { urls: "stun:stunserver2024.stunprotocol.org:3478" },
       { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun.l.google.com:5349" },
-      { urls: "stun:stun1.l.google.com:3478" },
-      { urls: "stun:stun1.l.google.com:5349" },
-      { urls: "stun:stun2.l.google.com:19302" },
-      { urls: "stun:stun2.l.google.com:5349" },
-      { urls: "stun:stun3.l.google.com:3478" },
-      { urls: "stun:stun3.l.google.com:5349" },
-      { urls: "stun:stun4.l.google.com:19302" },
-      { urls: "stun:stun4.l.google.com:5349" }
+      // { urls: "stun:stun.l.google.com:5349" },
+      // { urls: "stun:stun1.l.google.com:3478" },
+      // { urls: "stun:stun1.l.google.com:5349" },
+      // { urls: "stun:stun2.l.google.com:19302" },
+      // { urls: "stun:stun2.l.google.com:5349" },
+      // { urls: "stun:stun3.l.google.com:3478" },
+      // { urls: "stun:stun3.l.google.com:5349" },
+      // { urls: "stun:stun4.l.google.com:19302" },
+      // { urls: "stun:stun4.l.google.com:5349" }
+      ...iceServers
     ],
-    iceCandidatePoolSize: 1
+    iceCandidatePoolSize: 1,
+    iceTransportPolicy: "all"
   }));
 
   const [otherUser, setOtherUser] = useState<IdToken | null>(null);
@@ -278,7 +284,7 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
 
         case "rtc:ice":
           console.log(`received candidate from ${from}: `, payload)
-          if(isHost){
+          if (isHost) {
             pendingOffers[from].iceCandidates.push(payload)
           } else {
             payload && await rtc.addIceCandidate(payload)
@@ -381,13 +387,19 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
   )
 }
 
-export function ChatPage({ session, peerId }: { session: Session, peerId?: string }) {
+export function ChatPage({ session, peerId, iceServers }: {
+  session: Session, peerId?: string, iceServers: {
+    urls: string,
+    username?: string,
+    credential?: string,
+  }[]
+}) {
   return (
     <UserProvider>
       <ThemeProvider>
         <AuthProvider>
           <ToastContainer theme='dark' />
-          <ChatApp session={session} peerId={peerId} />
+          <ChatApp session={session} peerId={peerId} iceServers={iceServers} />
         </AuthProvider>
       </ThemeProvider>
     </UserProvider>

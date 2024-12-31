@@ -24,6 +24,7 @@
     "mlkem": "^2.3.0",
     "mqtt": "^5.10.3",
     "next": "15.1.2",
+    "node-fetch": "^3.3.2",
     "react": "^19.0.0",
     "react-copy-to-clipboard": "^5.1.0",
     "react-dom": "^19.0.0",
