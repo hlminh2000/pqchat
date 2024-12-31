@@ -5,10 +5,10 @@ import Button from '@mui/material/Button'
 import Box from '@mui/material/Box'
 import Link from '@mui/material/Link'
 import { Lock } from '@mui/icons-material'
-import { useAuth0 } from '@auth0/auth0-react'
+import { useUser } from '@auth0/nextjs-auth0/client'
 
 export default function Header() {
-  const { isLoading, user, logout } = useAuth0();
+  const { isLoading, user } = useUser();
   return (
     <AppBar position="static" color="default" elevation={1}>
       <Toolbar>
@@ -27,13 +27,11 @@ export default function Header() {
           </Link>
           {!isLoading && !!user && (
             <Box mx={2}>
-              <Button
-                variant="outlined"
-                color="error"
-                onClick={() => logout()}
-              >
-                Logout
-              </Button>
+              <Link href="/api/auth/logout">
+                <Button variant="outlined" color="error">
+                  Logout
+                </Button>
+              </Link>
             </Box>
           )}
           <Link href="/chat">
