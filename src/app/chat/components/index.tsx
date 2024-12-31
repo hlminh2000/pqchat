@@ -1,11 +1,10 @@
 "use client";
 
-import dynamic from 'next/dynamic'
 import { ReactNode, useEffect, useState } from "react";
 import { AppBar, Box, Button, CircularProgress, Container, Stack, styled, Toolbar, Typography } from "@mui/material";
 import ChatUI, { ChatMessage } from "@/app/chat/components/chatui";
 import dayjs from "dayjs";
-import { IdToken, useAuth0 } from '@auth0/auth0-react';
+import { IdToken } from '@auth0/auth0-react';
 import { InfoButton } from "@/app/chat/components/InfoButton";
 import { EncryptedData, SymmetricCryptoUtils } from "@/common/utils/SymmetricCryptoUtil";
 import { ToastContainer, toast } from 'react-toastify';
@@ -25,21 +24,6 @@ const StyledAppBar = styled(AppBar)(({ theme }) => ({
   boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
 }));
 
-const useSortedMessages = () => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    // ...dummyMessages
-  ]);
-  const addMessage = (message: ChatMessage) => {
-    // heuristically, just sort the last 10 mesasges, previous ones are assumed sorted
-    setMessages(prevMessages => {
-      const newMessages = [...prevMessages, message];
-      const lastTenMessages = newMessages.slice(-10).sort((a, b) => dayjs(a.timestamp).diff(dayjs(b.timestamp)));
-      return [...newMessages.slice(0, -10), ...lastTenMessages];
-    });
-  };
-  return { messages, addMessage };
-}
-
 const symCryptoUtil = new SymmetricCryptoUtils();
 
 const ChatApp = ({ session, peerId, iceServers }: {
@@ -54,10 +38,20 @@ const ChatApp = ({ session, peerId, iceServers }: {
   // const { user,  } = useAuth0();
   const { user, isLoading: isLoadingUser } = useUser();
 
-  const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [isDataChannelOpen, setIsDataChannelOpen] = useState(false);
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
-  const { messages, addMessage } = useSortedMessages();
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    // ...dummyMessages
+  ]);
+  const addMessage = (message: ChatMessage) => {
+    // heuristically, just sort the last 10 mesasges, previous ones are assumed sorted
+    setMessages(prevMessages => {
+      console.log("prevMessages: ", prevMessages)
+      const newMessages = [...prevMessages, message];
+      const lastTenMessages = newMessages.slice(-10).sort((a, b) => dayjs(a.timestamp).diff(dayjs(b.timestamp)));
+      return [...newMessages.slice(0, -10), ...lastTenMessages];
+    });
+  };
 
   /********************************************/
   /**** Key exchange state transformations ****/
@@ -95,6 +89,9 @@ const ChatApp = ({ session, peerId, iceServers }: {
   /**********************************************/
   /**********************************************/
 
+  const [selfId] = useState(crypto.randomUUID())
+  const [otherUser, setOtherUser] = useState<IdToken | null>(null);
+
   type SerializedRtcMessage = { type: "pk", data: { pk: string } }
     | { type: "sharedSecret", data: { kemCt: string } }  // encrypted cipher
     | { type: "chat", data: EncryptedData }
@@ -116,24 +113,14 @@ const ChatApp = ({ session, peerId, iceServers }: {
     message && dataChannel.send(message)
   }
 
-  const handleChannelOpen = (dataChannel: RTCDataChannel) => async () => {
-    console.log("channel open!")
-    dataChannel.onmessage = handleDataChannelMessage
-    await new Promise(resolve => setTimeout(resolve, 1000)) // wait for a second to ensure the other side is ready
-    const [pk, sk] = await kemKeypair
-    const pkString: string = pk ? uintArrayToB64(pk) : ""
-    await sendRtcMessage({ type: "pk", data: { pk: pkString } })
-    setIsDataChannelOpen(true);
-  }
-
-  const handleDataChannelMessage = async (event: MessageEvent) => {
+  const onRtcMessage = async (event: MessageEvent) => {
     console.log("rtc message: ", event.data)
     const rtcMessage: SerializedRtcMessage = JSON.parse(event.data);
     if (rtcMessage.type === "pk") {
       const { pk } = rtcMessage.data
       setPeerPk(() => b64ToUintArray(pk))
-    } else if (rtcMessage.type === "chat" && aesKey) {
-      const decryptedChatMessage = JSON.parse(await symCryptoUtil.decrypt(rtcMessage.data, aesKey)) as ChatMessage
+    } else if (rtcMessage.type === "chat") {
+      const decryptedChatMessage = JSON.parse(await symCryptoUtil.decrypt(rtcMessage.data, aesKey as CryptoKey)) as ChatMessage
       console.log("decryptedChatMessage: ", decryptedChatMessage)
       addMessage({ ...decryptedChatMessage, isUser: false });
     } else if (rtcMessage.type === "sharedSecret") {
@@ -141,197 +128,131 @@ const ChatApp = ({ session, peerId, iceServers }: {
       setKemCt(() => b64ToUintArray(kemCt))
     }
   }
-
+  const onRtcDatachannelClose = () => {
+    setIsDataChannelOpen(false);
+    toast(`${otherUser?.email || otherUser?.nickname} has left`)
+  }
+  const onRtcDatachannelOpen = async () => {
+    console.log("onRtcDatachannelOpen", dataChannel)
+    const [pk] = await kemKeypair
+    sendRtcMessage({ type: "pk", data: { pk: uintArrayToB64(pk) } })
+    kemCt && sendRtcMessage({ type: "sharedSecret", data: { kemCt: uintArrayToB64(kemCt) } })
+    setIsDataChannelOpen(true);
+  }
   useEffect(() => {
-    if (dataChannel?.readyState === "open") {
-      handleChannelOpen(dataChannel)()
-    }
+    if(!dataChannel) return
+    dataChannel.onmessage = onRtcMessage
+    dataChannel.onclose = onRtcDatachannelClose
+    dataChannel.onopen = onRtcDatachannelOpen
+  }, [dataChannel, aesKey])
+  useEffect(() => {
+    if (!dataChannel) return
+    dataChannel?.readyState === "open" && onRtcDatachannelOpen()
   }, [dataChannel])
 
+  /************** RTC Signaling **************/
   useEffect(() => {
-    if (!dataChannel) return;
+    const rtc = new RTCPeerConnection({
+      iceServers: [
+        { urls: "stun:stunserver2024.stunprotocol.org:3478" },
+        { urls: "stun:stun.l.google.com:19302" },
+        ...iceServers
+      ],
+      iceCandidatePoolSize: 1,
+      iceTransportPolicy: "all"
+    })
 
-    dataChannel.onclose = event => {
-      setIsDataChannelOpen(false);
-      toast(`${otherUser?.email || otherUser?.nickname} has left`)
-    }
-    dataChannel.onmessage = handleDataChannelMessage
-    dataChannel.onopen = handleChannelOpen(dataChannel)
-  }, [dataChannel, addMessage, handleChannelOpen]);
-
-  const [selfId] = useState(crypto.randomUUID())
-  const [rtc] = useState(new RTCPeerConnection({
-    iceServers: [
-      { urls: "stun:stunserver2024.stunprotocol.org:3478" },
-      { urls: "stun:stun.l.google.com:19302" },
-      // { urls: "stun:stun.l.google.com:5349" },
-      // { urls: "stun:stun1.l.google.com:3478" },
-      // { urls: "stun:stun1.l.google.com:5349" },
-      // { urls: "stun:stun2.l.google.com:19302" },
-      // { urls: "stun:stun2.l.google.com:5349" },
-      // { urls: "stun:stun3.l.google.com:3478" },
-      // { urls: "stun:stun3.l.google.com:5349" },
-      // { urls: "stun:stun4.l.google.com:19302" },
-      // { urls: "stun:stun4.l.google.com:5349" }
-      ...iceServers
-    ],
-    iceCandidatePoolSize: 1,
-    iceTransportPolicy: "all"
-  }));
-
-  const [otherUser, setOtherUser] = useState<IdToken | null>(null);
-  useEffect(() => {
     const ablyClient = new Ably.Realtime({ authUrl: '/api/ably' })
-    const signalingChannel = ablyClient.channels.get(`signaling:${selfId}`);
+    const signalingChannel = ablyClient.channels.get(`signaling:${isHost ? selfId : peerId}`);
 
-    // Keep track of pending offers
-    const pendingOffers: {
-      [k: string]: {
-        offer: RTCSessionDescriptionInit | null,
-        iceCandidates: RTCIceCandidate[]
+    if (isHost) {
+      rtc.ondatachannel = async ({ channel: dataChannel }) => {
+        setDataChannel(dataChannel)
       }
-    } = {}
-
-    const listener: Ably.messageCallback<Ably.InboundMessage> = async ({ data: { from, payload }, name }) => {
-      const targetAblyChannel = ablyClient.channels.get(`signaling:${from}`)
-      pendingOffers[from] = pendingOffers[from] || {
-        offer: null,
-        iceCandidates: []
-      }
-
-      const waitForIceCandidates = async (peerId: string) => {
-        // setRemoteDescription has to be called before addIceCandidate
-        const pendingOffer = pendingOffers[peerId];
-        await new Promise<void>((resolve) => {
-          const check = setInterval(() => {
-            console.log("pendingOffer: ", pendingOffer)
-            if (pendingOffer.iceCandidates.at(-1) === null) {
-              resolve()
-              clearInterval(check)
-            }
-          }, 1000)
-        })
-        pendingOffer.offer && await rtc.setRemoteDescription(pendingOffer.offer as RTCSessionDescriptionInit)
-        for (const candidate of pendingOffer.iceCandidates) {
-          console.log("candidate: ", candidate)
-          if (candidate) await rtc.addIceCandidate(candidate)
-        }
-      }
-
-      switch (name as "rtc:offer" | "rtc:answer" | "rtc:ice" | "rtc:deny") {
-        case "rtc:offer": {
-          const { offer, idToken } = payload;
-          const { valid, payload: userData } = await verifyIdToken(idToken)
-          // const issuedAt = dayjs((userData?.iat || 0) * 1000)
-          // if (issuedAt.isBefore(dayjs().subtract(1, "hour"))) {
-          //   console.log("identity too old")
-          //   return
-          // }
-          if (!valid) return
-
-          const { nickname, email } = userData
-
-          toast(
-            ({ closeToast }) => {
-              const [loading, setLoading] = useState(false);
-              return (
-                <Stack flex={1}>
-                  <Box>{email || nickname || ""} would like to connect</Box>
-                  <Box mt={1} display={"flex"} justifyContent={"flex-end"}>
-                    <Button
-                      size='small' variant='outlined'
-                      disabled={loading}
-                      // @ts-ignore
-                      color='primary.contrastText'
-                      onClick={async () => {
-                        setLoading(true)
-                        pendingOffers[from].offer = offer
-                        await waitForIceCandidates(from);
-                        const answer = await rtc.createAnswer();
-                        const idToken = session?.idToken
-                        await rtc.setLocalDescription(answer);
-                        targetAblyChannel.publish("rtc:answer", { from, payload: { answer, idToken } })
-                        setOtherUser(userData)
-                        closeToast();
-                      }}>Accept</Button>
-                    <Box mr={1}></Box>
-                    <Button
-                      size='small' variant='text'
-                      disabled={loading}
-                      // @ts-ignore
-                      color='primary.contrastText'
-                      onClick={async () => {
-                        targetAblyChannel.publish("rtc:deny", { from })
-                        closeToast();
-                      }}>Deny</Button>
-                    {loading && <CircularProgress color="inherit" />}
-                  </Box>
-                </Stack>
-              )
-            },
-            { autoClose: false, closeButton: () => null }
-          )
-          break;
-        }
-        case "rtc:answer":
-          console.log(`received answer from ${from}: `, payload)
-          const { answer, idToken } = payload;
-          const { valid, payload: userData } = await verifyIdToken(idToken)
-          if (!valid) return
-          setOtherUser(userData)
-          await rtc.setRemoteDescription(answer);
-          break;
-
-        case "rtc:ice":
-          console.log(`received candidate from ${from}: `, payload)
-          if (isHost) {
-            pendingOffers[from].iceCandidates.push(payload)
-          } else {
-            payload && await rtc.addIceCandidate(payload)
-          }
-          break;
-
-        case "rtc:deny":
-          toast.error("Your connection request was denied.")
-          break;
-      }
+    } else {
+      const dataChannel = rtc.createDataChannel("chat")
+      setDataChannel(dataChannel)
     }
+
+    const iceCandidateQueue: RTCIceCandidateInit[] = []
+    rtc.onicecandidate = async (event) => {
+      await signalingChannel?.publish("rtc:icecandidate", { id: selfId, candidate: event.candidate })
+    }
+    signalingChannel.subscribe("rtc:icecandidate", async ({ name, data }) => {
+      const { id, candidate } = data
+      if (id === selfId) return
+      console.log(name, data)
+      iceCandidateQueue.push(candidate)
+      candidate && await rtc.addIceCandidate(new RTCIceCandidate(candidate))
+    })
+    isHost && signalingChannel.subscribe("rtc:offer", async ({ name, data }) => {
+      console.log(name, data)
+      const {offer, idToken} = data
+      const { valid, payload: userData } = await verifyIdToken(idToken)
+      if(!valid) return 
+      
+      !rtc.currentRemoteDescription && await rtc.setRemoteDescription(new RTCSessionDescription(offer))
+
+      toast(
+        ({ closeToast }) => {
+          const [loading, setLoading] = useState(false);
+          return (
+            <Stack flex={1}>
+              <Box>{userData.email || userData.nickname || ""} would like to connect</Box>
+              <Box mt={1} display={"flex"} justifyContent={"flex-end"}>
+                <Button
+                  size='small' variant='outlined'
+                  disabled={loading}
+                  // @ts-ignore
+                  color='primary.contrastText'
+                  onClick={async () => {
+                    setLoading(true)
+                    
+                    const answer = await rtc.createAnswer()
+                    !rtc.currentLocalDescription && await rtc.setLocalDescription(new RTCSessionDescription(answer))
+                    signalingChannel.publish("rtc:answer", answer)
+
+                    setOtherUser(userData)
+                    closeToast();
+                  }}>Accept</Button>
+                <Box mr={1}></Box>
+                <Button
+                  size='small' variant='text'
+                  disabled={loading}
+                  // @ts-ignore
+                  color='primary.contrastText'
+                  onClick={async () => {
+                    signalingChannel.publish("rtc:deny", { })
+                    closeToast();
+                  }}>Deny</Button>
+                {loading && <CircularProgress color="inherit" />}
+              </Box>
+            </Stack>
+          )
+        },
+        { autoClose: false, closeButton: () => null }
+      )
+    })
+    !isHost && signalingChannel.subscribe("rtc:answer", async ({ name, data }) => {
+      console.log(name, data)
+      !rtc.currentRemoteDescription && await rtc.setRemoteDescription(new RTCSessionDescription(data))
+    })
+    !isHost && signalingChannel.subscribe("rtc:deny", async ({ name, data }) => {
+      console.log(name, data)
+      toast("Your request was denied", {type: "error"})
+    })
 
     const init = async () => {
-      const peerSignalingChannel = ablyClient.channels.get(`signaling:${peerId}`)
-      rtc.onicecandidate = async event => {
-        console.log("own candidate: ", event.candidate)
-        await peerSignalingChannel.publish("rtc:ice", { from: selfId, payload: event.candidate });
-      }
       if (!isHost) {
-
-        setDataChannel(rtc.createDataChannel("chatChannel"))
-
         const offer = await rtc.createOffer();
-        await rtc.setLocalDescription(offer);
-        const idToken = session?.idToken
-        await peerSignalingChannel.publish("rtc:offer", { from: selfId, payload: { offer, idToken } });
+        !rtc.currentLocalDescription && await rtc.setLocalDescription(new RTCSessionDescription(offer))
+        await signalingChannel?.publish("rtc:offer", { offer, idToken: session.idToken })
       }
-      await signalingChannel.subscribe(listener)
-      setIsSocketConnected(true)
     }
+    init()
+  }, [])
+  /********************************************/
 
-    init();
-
-    return () => signalingChannel.unsubscribe(listener)
-
-  }, [rtc]);
-
-
-  useEffect(() => {
-    rtc.ondatachannel = event => {
-      console.log("rtc.ondatachannel: ", event)
-      setDataChannel(event.channel)
-    }
-    rtc.oniceconnectionstatechange = event => {
-      console.log("rtc.oniceconnectionstatechange:", event)
-    };
-  }, [rtc, setDataChannel]);
 
   const sendChatMessage = async (message: string) => {
     const chatMessage = {
@@ -356,7 +277,7 @@ const ChatApp = ({ session, peerId, iceServers }: {
         <StyledAppBar position="sticky">
           <Toolbar variant="dense">
             <Box flex={1} display="flex" flexDirection={{ xs: "row" }} alignItems="center">
-              {isSocketConnected && isHost && (
+              {isHost && (
                 <Box mr={{ xs: 0, sm: 2 }} display={"inline"}>
                   <InfoButton sessionUrl={sessionUrl} />
                 </Box>
@@ -381,31 +302,24 @@ const ChatApp = ({ session, peerId, iceServers }: {
           enabled={isChatReady}
         />
       </Box>
-      <LoadingOverlay open={!isSocketConnected} message={"Connecting..."} />
-      <LoadingOverlay open={isSocketConnected && !isChatReady && !isHost} message={"Waiting for host to accept your request..."} />
+      <LoadingOverlay open={ !isChatReady && !isHost } message={"Waiting for host to accept your request..."} />
     </main>
   )
 }
 
-export function ChatPage({ session, peerId, iceServers }: {
+export const ChatPage = ({ session, peerId, iceServers }: {
   session: Session, peerId?: string, iceServers: {
     urls: string,
     username?: string,
     credential?: string,
   }[]
-}) {
-  return (
-    <UserProvider>
-      <ThemeProvider>
-        <AuthProvider>
-          <ToastContainer theme='dark' />
-          <ChatApp session={session} peerId={peerId} iceServers={iceServers} />
-        </AuthProvider>
-      </ThemeProvider>
-    </UserProvider>
-  );
-}
-
-export default dynamic(() => Promise.resolve(ChatPage), {
-  ssr: false
-})
+}) => (
+  <UserProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ToastContainer theme='dark' />
+        <ChatApp session={session} peerId={peerId} iceServers={iceServers} />
+      </AuthProvider>
+    </ThemeProvider>
+  </UserProvider>
+)

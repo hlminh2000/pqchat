@@ -1,6 +1,6 @@
 
-// import { ChatPage } from "./components";
-import ChatPage from "./components";
+import { ChatPage } from "./components";
+// import ChatPage from "./components";
 import { withPageAuthRequired, getSession } from '@auth0/nextjs-auth0';
 import fetch from 'node-fetch';
 
@@ -26,7 +26,7 @@ export default withPageAuthRequired(async ({ searchParams }) => {
     <ChatPage
       // @ts-ignore
       session={{ ...session }}
-      peerId={searchParams?.peerId as string}
+      peerId={(await searchParams)?.peerId as string}
       iceServers={iceServers}
     />
   )
