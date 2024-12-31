@@ -103,9 +103,9 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
       message = JSON.stringify(data))
     } else if (data.type === "chat" && aesKey) {
       const encryptedChatMessage = await symCryptoUtil.encrypt(JSON.stringify(data.data), aesKey)
-      message = JSON.stringify({ ...data, data: encryptedChatMessage }))
+      message = JSON.stringify({ ...data, data: encryptedChatMessage })
     } else if (data.type === "sharedSecret") {
-      message = JSON.stringify(data))
+      message = JSON.stringify(data)
     }
     console.log("sending RTC message: ", message)
     message && dataChannel.send(message)
