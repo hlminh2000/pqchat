@@ -1,6 +1,5 @@
 
 import { ChatPage } from "./components";
-// import ChatPage from "./components";
 import { withPageAuthRequired, getSession } from '@auth0/nextjs-auth0';
 import fetch from 'node-fetch';
 

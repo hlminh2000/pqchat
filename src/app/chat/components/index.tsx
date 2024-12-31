@@ -1,7 +1,7 @@
 "use client";
 
-import { ReactNode, useEffect, useState } from "react";
-import { AppBar, Box, Button, CircularProgress, Container, Stack, styled, Toolbar, Typography } from "@mui/material";
+import { useEffect, useState } from "react";
+import { AppBar, Box, Button, CircularProgress, Stack, styled, Toolbar } from "@mui/material";
 import ChatUI, { ChatMessage } from "@/app/chat/components/chatui";
 import dayjs from "dayjs";
 import { IdToken } from '@auth0/auth0-react';
@@ -174,7 +174,6 @@ const ChatApp = ({ session, peerId, iceServers }: {
       setDataChannel(dataChannel)
     }
 
-    const iceCandidateQueue: RTCIceCandidateInit[] = []
     rtc.onicecandidate = async (event) => {
       await signalingChannel?.publish("rtc:icecandidate", { id: selfId, candidate: event.candidate })
     }
@@ -182,7 +181,14 @@ const ChatApp = ({ session, peerId, iceServers }: {
       const { id, candidate } = data
       if (id === selfId) return
       console.log(name, data)
-      iceCandidateQueue.push(candidate)
+      await new Promise<void>(resolve => {
+        const interval = setInterval(() => {
+          if (!!rtc.currentRemoteDescription) {
+            resolve()
+            clearInterval(interval)
+          }
+        }, 0)
+      })
       candidate && await rtc.addIceCandidate(new RTCIceCandidate(candidate))
     })
     isHost && signalingChannel.subscribe("rtc:offer", async ({ name, data }) => {
