@@ -97,16 +97,18 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
     | { type: "sharedSecret", data: { kemCt: string } }
     | { type: "chat", data: ChatMessage }
   const sendRtcMessage = async (data: RtcMessage) => {
-    console.log("sending RTC message: ", data)
     if (!dataChannel) return
+    let message = ''
     if (data.type === "pk") {
-      dataChannel.send(JSON.stringify(data))
+      message = JSON.stringify(data))
     } else if (data.type === "chat" && aesKey) {
       const encryptedChatMessage = await symCryptoUtil.encrypt(JSON.stringify(data.data), aesKey)
-      dataChannel.send(JSON.stringify({ ...data, data: encryptedChatMessage }))
+      message = JSON.stringify({ ...data, data: encryptedChatMessage }))
     } else if (data.type === "sharedSecret") {
-      dataChannel.send(JSON.stringify(data))
+      message = JSON.stringify(data))
     }
+    console.log("sending RTC message: ", message)
+    message && dataChannel.send(message)
   }
 
   const handleChannelOpen = (dataChannel: RTCDataChannel) => async () => {
