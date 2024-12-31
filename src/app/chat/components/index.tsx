@@ -208,11 +208,11 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
         case "rtc:offer": {
           const { offer, idToken } = payload;
           const { valid, payload: userData } = await verifyIdToken(idToken)
-          const issuedAt = dayjs((userData?.iat || 0) * 1000)
-          if (issuedAt.isBefore(dayjs().subtract(1, "hour"))) {
-            console.log("identity too old")
-            return
-          }
+          // const issuedAt = dayjs((userData?.iat || 0) * 1000)
+          // if (issuedAt.isBefore(dayjs().subtract(1, "hour"))) {
+          //   console.log("identity too old")
+          //   return
+          // }
           if (!valid) return
 
           const { nickname, email } = userData
