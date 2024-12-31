@@ -280,7 +280,6 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
           console.log(`received candidate from ${from}: `, payload)
           if(isHost){
             pendingOffers[from].iceCandidates.push(payload)
-            await waitForIceCandidates(from)
           } else {
             payload && await rtc.addIceCandidate(payload)
           }
