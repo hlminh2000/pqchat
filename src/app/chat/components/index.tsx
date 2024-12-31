@@ -130,7 +130,7 @@ const ChatApp = ({ session, peerId, iceServers }: {
   }
   const onRtcDatachannelClose = () => {
     setIsDataChannelOpen(false);
-    toast(`${otherUser?.email || otherUser?.nickname} has left`)
+    toast(`${otherUser?.email || otherUser?.nickname || "The other side"} has left`)
   }
   const onRtcDatachannelOpen = async () => {
     console.log("onRtcDatachannelOpen", dataChannel)
@@ -210,7 +210,7 @@ const ChatApp = ({ session, peerId, iceServers }: {
                     
                     const answer = await rtc.createAnswer()
                     !rtc.currentLocalDescription && await rtc.setLocalDescription(new RTCSessionDescription(answer))
-                    signalingChannel.publish("rtc:answer", answer)
+                    signalingChannel.publish("rtc:answer", { answer, idToken: session.idToken })
 
                     setOtherUser(userData)
                     closeToast();
@@ -235,7 +235,12 @@ const ChatApp = ({ session, peerId, iceServers }: {
     })
     !isHost && signalingChannel.subscribe("rtc:answer", async ({ name, data }) => {
       console.log(name, data)
-      !rtc.currentRemoteDescription && await rtc.setRemoteDescription(new RTCSessionDescription(data))
+      const { answer, idToken } = data
+      const { valid, payload: userData } = await verifyIdToken(idToken)
+      if (!valid) return
+      toast(`${userData.email || userData.nickname || "The host"} has joined`)
+      setOtherUser(userData)
+      !rtc.currentRemoteDescription && await rtc.setRemoteDescription(new RTCSessionDescription(answer))
     })
     !isHost && signalingChannel.subscribe("rtc:deny", async ({ name, data }) => {
       console.log(name, data)
