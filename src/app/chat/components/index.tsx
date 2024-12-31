@@ -100,7 +100,7 @@ const ChatApp = ({ session, peerId }: { session: Session, peerId?: string }) => 
     if (!dataChannel) return
     let message = ''
     if (data.type === "pk") {
-      message = JSON.stringify(data))
+      message = JSON.stringify(data)
     } else if (data.type === "chat" && aesKey) {
       const encryptedChatMessage = await symCryptoUtil.encrypt(JSON.stringify(data.data), aesKey)
       message = JSON.stringify({ ...data, data: encryptedChatMessage })
