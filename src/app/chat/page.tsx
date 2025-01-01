@@ -2,6 +2,7 @@
 import { ChatPage } from "./components";
 import { withPageAuthRequired, getSession } from '@auth0/nextjs-auth0';
 import fetch from 'node-fetch';
+import { headers } from 'next/headers'
 
 export default withPageAuthRequired(async ({ searchParams }) => {
   const session = await getSession()
@@ -21,12 +22,18 @@ export default withPageAuthRequired(async ({ searchParams }) => {
     credential?: string,
   }[]>);
 
+  const headersList = await headers();
+  const host = headersList.get('X-Forwarded-Host');
+  const proto = headersList.get('X-Forwarded-Proto');
+  const origin = `${proto}://${host}`;
+
   return (
     <ChatPage
       // @ts-ignore
       session={{ ...session }}
       peerId={(await searchParams)?.peerId as string}
       iceServers={iceServers}
+      origin={origin}
     />
   )
 }, {

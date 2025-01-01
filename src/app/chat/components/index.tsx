@@ -35,8 +35,11 @@ const waitFor = (predicate: () => boolean) => new Promise<void>(resolve => {
   }, 500);
 })
 
-const ChatApp = ({ session, peerId, iceServers }: {
-  session: Session, peerId?: string, iceServers: {
+const ChatApp = ({ session, peerId, iceServers, origin }: {
+  session: Session,
+  origin: string,
+  peerId?: string,
+  iceServers: {
     urls: string,
     username?: string,
     credential?: string,
@@ -149,7 +152,7 @@ const ChatApp = ({ session, peerId, iceServers }: {
     setIsDataChannelOpen(true);
   }
   useEffect(() => {
-    if(!dataChannel) return
+    if (!dataChannel) return
     dataChannel.onmessage = onRtcMessage
     dataChannel.onclose = onRtcDatachannelClose
     dataChannel.onopen = onRtcDatachannelOpen
@@ -160,6 +163,7 @@ const ChatApp = ({ session, peerId, iceServers }: {
   }, [dataChannel])
 
   /************** RTC Signaling **************/
+  const [isAnsweringRtcSignal, setIsAnsweringRtcSignal] = useState(false);
   useEffect(() => {
     const rtc = new RTCPeerConnection({
       iceServers: [
@@ -170,6 +174,8 @@ const ChatApp = ({ session, peerId, iceServers }: {
       iceCandidatePoolSize: 1,
       iceTransportPolicy: "all"
     })
+
+    // @ts-ignore
     window.rtc = rtc
 
     const ablyClient = new Ably.Realtime({ authUrl: '/api/ably' })
@@ -196,50 +202,47 @@ const ChatApp = ({ session, peerId, iceServers }: {
     })
     isHost && signalingChannel.subscribe("rtc:offer", async ({ name, data }) => {
       console.log(name, data)
-      const {offer, idToken} = data
+      const { offer, idToken } = data
       const { valid, payload: userData } = await verifyIdToken(idToken)
-      if(!valid) return 
-      
+      if (!valid) return
+
       !rtc.currentRemoteDescription && await rtc.setRemoteDescription(new RTCSessionDescription(offer))
 
       toast(
-        ({ closeToast }) => {
-          const [loading, setLoading] = useState(false);
-          return (
-            <Stack flex={1}>
-              <Box>{userData.email || userData.nickname || ""} would like to connect</Box>
-              <Box mt={1} display={"flex"} justifyContent={"flex-end"}>
-                <Button
-                  size='small' variant='outlined'
-                  disabled={loading}
-                  // @ts-ignore
-                  color='primary.contrastText'
-                  onClick={async () => {
-                    setLoading(true)
-                    
-                    const answer = await rtc.createAnswer()
-                    !rtc.currentLocalDescription && await rtc.setLocalDescription(new RTCSessionDescription(answer))
-                    await waitFor(() => rtc.iceGatheringState === "complete")
-                    signalingChannel.publish("rtc:answer", { answer, idToken: session.idToken })
+        ({ closeToast }) => (
+          <Stack flex={1}>
+            <Box>{userData.email || userData.nickname || ""} would like to connect</Box>
+            <Box mt={1} display={"flex"} justifyContent={"flex-end"}>
+              <Button
+                size='small' variant='outlined'
+                disabled={isAnsweringRtcSignal}
+                // @ts-ignore
+                color='primary.contrastText'
+                onClick={async () => {
+                  setIsAnsweringRtcSignal(true)
 
-                    setOtherUser(userData)
-                    closeToast();
-                  }}>Accept</Button>
-                <Box mr={1}></Box>
-                <Button
-                  size='small' variant='text'
-                  disabled={loading}
-                  // @ts-ignore
-                  color='primary.contrastText'
-                  onClick={async () => {
-                    signalingChannel.publish("rtc:deny", { })
-                    closeToast();
-                  }}>Deny</Button>
-                {loading && <CircularProgress color="inherit" />}
-              </Box>
-            </Stack>
-          )
-        },
+                  const answer = await rtc.createAnswer()
+                  !rtc.currentLocalDescription && await rtc.setLocalDescription(new RTCSessionDescription(answer))
+                  await waitFor(() => rtc.iceGatheringState === "complete")
+                  signalingChannel.publish("rtc:answer", { answer, idToken: session.idToken })
+
+                  setOtherUser(userData)
+                  closeToast();
+                }}>Accept</Button>
+              <Box mr={1}></Box>
+              <Button
+                size='small' variant='text'
+                disabled={isAnsweringRtcSignal}
+                // @ts-ignore
+                color='primary.contrastText'
+                onClick={async () => {
+                  signalingChannel.publish("rtc:deny", {})
+                  closeToast();
+                }}>Deny</Button>
+              {isAnsweringRtcSignal && <CircularProgress color="inherit" />}
+            </Box>
+          </Stack>
+        ),
         { autoClose: false, closeButton: () => null }
       )
     })
@@ -254,7 +257,7 @@ const ChatApp = ({ session, peerId, iceServers }: {
     })
     !isHost && signalingChannel.subscribe("rtc:deny", async ({ name, data }) => {
       console.log(name, data)
-      toast("Your request was denied", {type: "error"})
+      toast("Your request was denied", { type: "error" })
     })
 
     const init = async () => {
@@ -283,8 +286,6 @@ const ChatApp = ({ session, peerId, iceServers }: {
     }
   }
 
-  const sessionUrl = typeof window === "undefined" ? "/chat" : `${window.location.origin}/chat?peerId=${selfId}`;
-
   const isChatReady = isDataChannelOpen && !!aesKey
   return (
     <main>
@@ -294,7 +295,7 @@ const ChatApp = ({ session, peerId, iceServers }: {
             <Box flex={1} display="flex" flexDirection={{ xs: "row" }} alignItems="center">
               {isHost && (
                 <Box mr={{ xs: 0, sm: 2 }} display={"inline"}>
-                  <InfoButton sessionUrl={sessionUrl} />
+                  <InfoButton sessionUrl={`${origin}/chat?peerId=${selfId}`} />
                 </Box>
               )}
               <a href='/chat' target='_blank'>
@@ -317,13 +318,16 @@ const ChatApp = ({ session, peerId, iceServers }: {
           enabled={isChatReady}
         />
       </Box>
-      <LoadingOverlay open={ !isChatReady && !isHost } message={"Waiting for host to accept your request..."} />
+      <LoadingOverlay open={!isChatReady && !isHost} message={"Waiting for host to accept your request..."} />
     </main>
   )
 }
 
-export const ChatPage = ({ session, peerId, iceServers }: {
-  session: Session, peerId?: string, iceServers: {
+export const ChatPage = ({ session, peerId, iceServers, origin }: {
+  session: Session, 
+  origin: string,
+  peerId?: string, 
+  iceServers: {
     urls: string,
     username?: string,
     credential?: string,
@@ -331,9 +335,9 @@ export const ChatPage = ({ session, peerId, iceServers }: {
 }) => (
   <UserProvider>
     <ThemeProvider>
-      <AuthProvider>
+      <AuthProvider origin={origin}>
         <ToastContainer theme='dark' />
-        <ChatApp session={session} peerId={peerId} iceServers={iceServers} />
+        <ChatApp session={session} peerId={peerId} iceServers={iceServers} origin={origin} />
       </AuthProvider>
     </ThemeProvider>
   </UserProvider>
