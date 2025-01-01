@@ -14,6 +14,7 @@ import { IoSend } from "react-icons/io5";
 import Markdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { dark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import dayjs from "dayjs";
 
 const ChatContainer = styled(Paper)(() => ({
   flex: 1,
@@ -157,7 +158,7 @@ const ChatUI = (props: {
                 variant="caption"
                 sx={{ opacity: 0.7, mt: 0.5, display: "block" }}
               >
-                {message.timestamp}
+                {dayjs(message.timestamp).format("HH:mm a")}
               </Typography>
             </MessageContent>
           </MessageBubble>
