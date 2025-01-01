@@ -68,8 +68,12 @@ const ChatApp = ({ session, peerId, iceServers, origin }: {
   /********************************************/
   /**** Key exchange state transformations ****/
   /********************************************/
-  const [mlKem] = useState(new MlKem1024());
-  const [kemKeypair] = useState<Promise<[Uint8Array<ArrayBufferLike>, Uint8Array<ArrayBufferLike>]>>(mlKem.generateKeyPair())
+  const [mlKem] = useState(
+    new MlKem1024()
+  );
+  const [kemKeypair] = useState<Promise<[Uint8Array<ArrayBufferLike>, Uint8Array<ArrayBufferLike>]>>(
+    mlKem.generateKeyPair()
+  )
   const [kemCt, setKemCt] = useState<Uint8Array<ArrayBufferLike> | null>(null)
   const [peerPk, setPeerPk] = useState<Uint8Array<ArrayBufferLike> | null>(null)
   const [aesKey, setAesKey] = useState<CryptoKey | null>(null)
