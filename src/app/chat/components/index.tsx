@@ -26,6 +26,15 @@ const StyledAppBar = styled(AppBar)(({ theme }) => ({
 
 const symCryptoUtil = new SymmetricCryptoUtils();
 
+const waitFor = (predicate: () => boolean) => new Promise<void>(resolve => {
+  const interval = setInterval(() => {
+    if (predicate()) {
+      clearInterval(interval);
+      resolve();
+    }
+  }, 500);
+})
+
 const ChatApp = ({ session, peerId, iceServers }: {
   session: Session, peerId?: string, iceServers: {
     urls: string,
@@ -114,7 +123,7 @@ const ChatApp = ({ session, peerId, iceServers }: {
   }
 
   const onRtcMessage = async (event: MessageEvent) => {
-    console.log("rtc message: ", event.data)
+    console.log("received RTC message: ", event.data)
     const rtcMessage: SerializedRtcMessage = JSON.parse(event.data);
     if (rtcMessage.type === "pk") {
       const { pk } = rtcMessage.data
@@ -161,6 +170,7 @@ const ChatApp = ({ session, peerId, iceServers }: {
       iceCandidatePoolSize: 1,
       iceTransportPolicy: "all"
     })
+    window.rtc = rtc
 
     const ablyClient = new Ably.Realtime({ authUrl: '/api/ably' })
     const signalingChannel = ablyClient.channels.get(`signaling:${isHost ? selfId : peerId}`);
@@ -181,14 +191,7 @@ const ChatApp = ({ session, peerId, iceServers }: {
       const { id, candidate } = data
       if (id === selfId) return
       console.log(name, data)
-      await new Promise<void>(resolve => {
-        const interval = setInterval(() => {
-          if (!!rtc.currentRemoteDescription) {
-            resolve()
-            clearInterval(interval)
-          }
-        }, 0)
-      })
+      await waitFor(() => !!rtc.currentRemoteDescription)
       candidate && await rtc.addIceCandidate(new RTCIceCandidate(candidate))
     })
     isHost && signalingChannel.subscribe("rtc:offer", async ({ name, data }) => {
@@ -216,6 +219,7 @@ const ChatApp = ({ session, peerId, iceServers }: {
                     
                     const answer = await rtc.createAnswer()
                     !rtc.currentLocalDescription && await rtc.setLocalDescription(new RTCSessionDescription(answer))
+                    await waitFor(() => rtc.iceGatheringState === "complete")
                     signalingChannel.publish("rtc:answer", { answer, idToken: session.idToken })
 
                     setOtherUser(userData)
