@@ -171,7 +171,6 @@ const ChatApp = ({ session, peerId, iceServers, origin }: {
   }, [dataChannel])
 
   /************** RTC Signaling **************/
-  const [isAnsweringRtcSignal, setIsAnsweringRtcSignal] = useState(false);
   useEffect(() => {
     const rtc = new RTCPeerConnection({
       iceServers: [
@@ -214,47 +213,51 @@ const ChatApp = ({ session, peerId, iceServers, origin }: {
       const { valid, payload: userData } = await verifyIdToken(idToken)
       if (!valid) return
 
-      !rtc.currentRemoteDescription && await rtc.setRemoteDescription(new RTCSessionDescription(offer))
 
       toast(
-        ({ closeToast }) => (
-          <Stack flex={1}>
-            <Box>{userData.email || userData.nickname || ""} would like to connect</Box>
-            <Box mt={1} display={"flex"} justifyContent={"flex-end"}>
-              {!isAnsweringRtcSignal && (
-                <>
-                  <Button
-                    size='small' variant='outlined'
-                    disabled={isAnsweringRtcSignal}
-                    // @ts-ignore
-                    color='primary.contrastText'
-                    onClick={async () => {
-                      setIsAnsweringRtcSignal(true)
+        ({ closeToast }) => {
+          const [isAnsweringRtcSignal, setIsAnsweringRtcSignal] = useState(false);
+          return (
+            <Stack flex={1}>
+              <Box>{userData.email || userData.nickname || ""} would like to connect</Box>
+              <Box mt={1} display={"flex"} justifyContent={"flex-end"}>
+                {!isAnsweringRtcSignal && (
+                  <>
+                    <Button
+                      size='small' variant='outlined'
+                      disabled={isAnsweringRtcSignal}
+                      // @ts-ignore
+                      color='primary.contrastText'
+                      onClick={async () => {
+                        setIsAnsweringRtcSignal(true)
 
-                      const answer = await rtc.createAnswer()
-                      !rtc.currentLocalDescription && await rtc.setLocalDescription(new RTCSessionDescription(answer))
-                      await waitFor(() => rtc.iceGatheringState === "complete")
-                      signalingChannel.publish("rtc:answer", { answer, idToken: session.idToken })
+                        !rtc.currentRemoteDescription && await rtc.setRemoteDescription(new RTCSessionDescription(offer))
 
-                      setOtherUser(userData)
-                      closeToast();
-                    }}>Accept</Button>
-                  <Box mr={1}></Box>
-                  <Button
-                    size='small' variant='text'
-                    disabled={isAnsweringRtcSignal}
-                    // @ts-ignore
-                    color='primary.contrastText'
-                    onClick={async () => {
-                      signalingChannel.publish("rtc:deny", {})
-                      closeToast();
-                    }}>Deny</Button>
-                </>
-              )}
-              {isAnsweringRtcSignal && <CircularProgress color="inherit" />}
-            </Box>
-          </Stack>
-        ),
+                        const answer = await rtc.createAnswer()
+                        !rtc.currentLocalDescription && await rtc.setLocalDescription(new RTCSessionDescription(answer))
+                        await waitFor(() => rtc.iceGatheringState === "complete")
+                        signalingChannel.publish("rtc:answer", { answer, idToken: session.idToken })
+
+                        setOtherUser(userData)
+                        closeToast();
+                      }}>Accept</Button>
+                    <Box mr={1}></Box>
+                    <Button
+                      size='small' variant='text'
+                      disabled={isAnsweringRtcSignal}
+                      // @ts-ignore
+                      color='primary.contrastText'
+                      onClick={async () => {
+                        signalingChannel.publish("rtc:deny", {})
+                        closeToast();
+                      }}>Deny</Button>
+                  </>
+                )}
+                {isAnsweringRtcSignal && <CircularProgress color="inherit" />}
+              </Box>
+            </Stack>
+          )
+        },
         { autoClose: false, closeButton: () => null }
       )
     })
