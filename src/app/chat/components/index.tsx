@@ -162,8 +162,12 @@ const ChatApp = ({ session, peerId, iceServers, origin }: {
     dataChannel.onopen = onRtcDatachannelOpen
   }, [dataChannel, aesKey])
   useEffect(() => {
-    if (!dataChannel) return
-    dataChannel?.readyState === "open" && onRtcDatachannelOpen()
+    const run = async () => {
+      if (!dataChannel) return
+      await waitFor(() => dataChannel?.readyState === "open")
+      onRtcDatachannelOpen()
+    }
+    run();
   }, [dataChannel])
 
   /************** RTC Signaling **************/
