@@ -10,7 +10,7 @@ export default withPageAuthRequired(async ({ searchParams }) => {
   const session = await getSession()
 
   const apiKey = process.env.METERED_API_KEY;
-  const url = new URL('https://minhified-pqchat.metered.live/api/v1/turn/credentials');
+  const url = new URL(`https://${process.env.METERED_DOMAIN}/api/v1/turn/credentials`);
   url.searchParams.append('apiKey', apiKey as string);
 
   const iceServers = await fetch(url.toString(), {
