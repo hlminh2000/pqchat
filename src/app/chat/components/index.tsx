@@ -221,32 +221,36 @@ const ChatApp = ({ session, peerId, iceServers, origin }: {
           <Stack flex={1}>
             <Box>{userData.email || userData.nickname || ""} would like to connect</Box>
             <Box mt={1} display={"flex"} justifyContent={"flex-end"}>
-              <Button
-                size='small' variant='outlined'
-                disabled={isAnsweringRtcSignal}
-                // @ts-ignore
-                color='primary.contrastText'
-                onClick={async () => {
-                  setIsAnsweringRtcSignal(true)
+              {!isAnsweringRtcSignal && (
+                <>
+                  <Button
+                    size='small' variant='outlined'
+                    disabled={isAnsweringRtcSignal}
+                    // @ts-ignore
+                    color='primary.contrastText'
+                    onClick={async () => {
+                      setIsAnsweringRtcSignal(true)
 
-                  const answer = await rtc.createAnswer()
-                  !rtc.currentLocalDescription && await rtc.setLocalDescription(new RTCSessionDescription(answer))
-                  await waitFor(() => rtc.iceGatheringState === "complete")
-                  signalingChannel.publish("rtc:answer", { answer, idToken: session.idToken })
+                      const answer = await rtc.createAnswer()
+                      !rtc.currentLocalDescription && await rtc.setLocalDescription(new RTCSessionDescription(answer))
+                      await waitFor(() => rtc.iceGatheringState === "complete")
+                      signalingChannel.publish("rtc:answer", { answer, idToken: session.idToken })
 
-                  setOtherUser(userData)
-                  closeToast();
-                }}>Accept</Button>
-              <Box mr={1}></Box>
-              <Button
-                size='small' variant='text'
-                disabled={isAnsweringRtcSignal}
-                // @ts-ignore
-                color='primary.contrastText'
-                onClick={async () => {
-                  signalingChannel.publish("rtc:deny", {})
-                  closeToast();
-                }}>Deny</Button>
+                      setOtherUser(userData)
+                      closeToast();
+                    }}>Accept</Button>
+                  <Box mr={1}></Box>
+                  <Button
+                    size='small' variant='text'
+                    disabled={isAnsweringRtcSignal}
+                    // @ts-ignore
+                    color='primary.contrastText'
+                    onClick={async () => {
+                      signalingChannel.publish("rtc:deny", {})
+                      closeToast();
+                    }}>Deny</Button>
+                </>
+              )}
               {isAnsweringRtcSignal && <CircularProgress color="inherit" />}
             </Box>
           </Stack>
@@ -332,9 +336,9 @@ const ChatApp = ({ session, peerId, iceServers, origin }: {
 }
 
 export const ChatPage = ({ session, peerId, iceServers, origin }: {
-  session: Session, 
+  session: Session,
   origin: string,
-  peerId?: string, 
+  peerId?: string,
   iceServers: {
     urls: string,
     username?: string,
