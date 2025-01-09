@@ -3,9 +3,9 @@ import IdTokenVerifier from 'idtoken-verifier';
 import { jwtDecode } from 'jwt-decode';
 
 const verifier = new IdTokenVerifier({
-  issuer: `https://dev-48o35gs7coyf2b7q.us.auth0.com/`,
-  audience: `9oVYYrTOPB4nkUcCFv1AkD99UacrXKqH`,
-  jwksURI: `https://dev-48o35gs7coyf2b7q.us.auth0.com/.well-known/jwks.json`
+  issuer: `https://${process.env.NEXT_PUBLIC_AUTH0_DOMAIN}/`,
+  audience: `${process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID}`,
+  jwksURI: `https://${process.env.NEXT_PUBLIC_AUTH0_DOMAIN}/.well-known/jwks.json`
 });
 
 export const verifyIdToken = (idToken: string) => new Promise<{
