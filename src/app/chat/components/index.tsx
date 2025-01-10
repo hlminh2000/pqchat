@@ -93,9 +93,7 @@ const ChatApp = ({ session, peerId, iceServers, origin }: {
       if (!peerPk || !peerKemCt || !selfSecret) return
       const [pk, sk] = await kemKeypair
       const peerSecret = await mlKem.decap(peerKemCt, sk);
-      const ss = new Uint8Array(
-        isHost ? [...selfSecret, ...peerSecret] : [...peerSecret, ...selfSecret]
-      )
+      const ss = new Uint8Array(selfSecret.map((byte, i) => byte ^ peerSecret[i]))  // merge the two secrets with XOR
       console.log("ss: ", ss)
       setAesKey(await sharedSecretToCryptoKey(ss))
       setIsDataChannelOpen(true);
