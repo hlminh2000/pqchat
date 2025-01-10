@@ -74,34 +74,33 @@ const ChatApp = ({ session, peerId, iceServers, origin }: {
   const [kemKeypair] = useState<Promise<[Uint8Array<ArrayBufferLike>, Uint8Array<ArrayBufferLike>]>>(
     mlKem.generateKeyPair()
   )
-  const [kemCt, setKemCt] = useState<Uint8Array<ArrayBufferLike> | null>(null)
+  const [peerKemCt, setPeerKemCt] = useState<Uint8Array<ArrayBufferLike> | null>(null)
   const [peerPk, setPeerPk] = useState<Uint8Array<ArrayBufferLike> | null>(null)
   const [aesKey, setAesKey] = useState<CryptoKey | null>(null)
+  const [selfSecret, setSelfSecret] = useState<Uint8Array<ArrayBufferLike> | null>(null)
 
   useEffect(() => {
     (async () => {
       if (!peerPk) return
-      if (isHost) {
-        const [ct, ss] = await mlKem.encap(peerPk);
-        console.log("ss: ", ss)
-        setKemCt(ct)
-        setAesKey(await sharedSecretToCryptoKey(ss))
-        await sendRtcMessage({ type: "sharedSecret", data: { kemCt: uintArrayToB64(ct) } })
-      }
+      const [ct, ss] = await mlKem.encap(peerPk);
+      setSelfSecret(ss)
+      await sendRtcMessage({ type: "sharedSecret", data: { kemCt: uintArrayToB64(ct) } })
     })()
   }, [peerPk])
 
   useEffect(() => {
     (async () => {
-      if (!peerPk || !kemCt) return
-      if (!isHost) {
-        const [pk, sk] = await kemKeypair
-        const ss = await mlKem.decap(kemCt, sk);
-        console.log("ss: ", ss)
-        setAesKey(await sharedSecretToCryptoKey(ss))
-      }
+      if (!peerPk || !peerKemCt || !selfSecret) return
+      const [pk, sk] = await kemKeypair
+      const peerSecret = await mlKem.decap(peerKemCt, sk);
+      const ss = new Uint8Array(
+        isHost ? [...selfSecret, ...peerSecret] : [...peerSecret, ...selfSecret]
+      )
+      console.log("ss: ", ss)
+      setAesKey(await sharedSecretToCryptoKey(ss))
+      setIsDataChannelOpen(true);
     })()
-  }, [peerPk, kemCt])
+  }, [peerPk, peerKemCt, selfSecret])
   /**********************************************/
   /**********************************************/
 
@@ -141,7 +140,7 @@ const ChatApp = ({ session, peerId, iceServers, origin }: {
       addMessage({ ...decryptedChatMessage, isUser: false });
     } else if (rtcMessage.type === "sharedSecret") {
       const { kemCt } = rtcMessage.data
-      setKemCt(() => b64ToUintArray(kemCt))
+      setPeerKemCt(() => b64ToUintArray(kemCt))
     }
   }
   const onRtcDatachannelClose = () => {
@@ -152,14 +151,11 @@ const ChatApp = ({ session, peerId, iceServers, origin }: {
     console.log("onRtcDatachannelOpen", dataChannel)
     const [pk] = await kemKeypair
     sendRtcMessage({ type: "pk", data: { pk: uintArrayToB64(pk) } })
-    kemCt && sendRtcMessage({ type: "sharedSecret", data: { kemCt: uintArrayToB64(kemCt) } })
-    setIsDataChannelOpen(true);
   }
   useEffect(() => {
     if (!dataChannel) return
     dataChannel.onmessage = onRtcMessage
     dataChannel.onclose = onRtcDatachannelClose
-    dataChannel.onopen = onRtcDatachannelOpen
   }, [dataChannel, aesKey])
   useEffect(() => {
     const run = async () => {
